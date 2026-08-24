@@ -134,6 +134,7 @@ export default function App() {
   const [highlightColor, setHighlightColor] = useState(DEFAULT_HIGHLIGHT_COLOR);
   const [zoneShape, setZoneShape] = useState<ZoneKind>('freehand');
   const [penColor, setPenColor] = useState(DEFAULT_PEN_COLOR);
+  const [nameFontFamily, setNameFontFamily] = useState('sans-serif');
   const [penPoints, setPenPoints] = useState<number[] | null>(null);
   const [schemeNames, setSchemeNames] = useState<string[]>([]);
   const [containerWidth, setContainerWidth] = useState(PITCH_WIDTH);
@@ -169,6 +170,13 @@ export default function App() {
   }, []);
 
   const scale = Math.min(MAX_PITCH_SCALE, containerWidth / PITCH_WIDTH);
+
+  useEffect(() => {
+    document.fonts
+      .load('800 16px "Rubik Tactic"')
+      .then(() => setNameFontFamily('Rubik Tactic, sans-serif'))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (mode !== 'select') setEditingPlayerId(null);
@@ -729,6 +737,7 @@ export default function App() {
                     data={p}
                     radius={PLAYER_RADIUS}
                     colors={p.team === 'A' ? colorsA : colorsB}
+                    nameFontFamily={nameFontFamily}
                     draggable={mode === 'select' && !isPlaying}
                     selected={p.id === editingPlayerId}
                     onSelect={mode === 'select' && !isPlaying ? handleSelectPlayer : undefined}
