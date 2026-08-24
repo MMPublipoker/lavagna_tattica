@@ -4,14 +4,14 @@ import { Layer, Stage } from 'react-konva';
 import './App.css';
 import ArrowShape from './components/ArrowShape';
 import BallToken from './components/BallToken';
-import FreeDrawShape from './components/FreeDrawShape';
 import Pitch from './components/Pitch';
 import PlayerToken from './components/PlayerToken';
 import Toolbar from './components/Toolbar';
+import ZoneShape from './components/ZoneShape';
 import { buildFormation } from './formations';
 import { deleteScheme, loadSchemes, saveScheme } from './schemes';
-import type { ArrowData, ArrowStyle, BoardState, Formation, FreeDrawData, ToolMode } from './types';
-import { easeInOutQuad, lerp, makeId } from './utils';
+import type { ArrowData, ArrowStyle, BoardState, Formation, ToolMode, ZoneData, ZoneKind } from './types';
+import { draftToEllipse, draftToRect, easeInOutQuad, lerp, makeId, type ShapeDraft } from './utils';
 
 const DEFAULT_HIGHLIGHT_COLOR = '#ffd43b';
 
@@ -30,8 +30,24 @@ function initialState(formationA: Formation, formationB: Formation): BoardState 
     ],
     ball: { id: 'ball', x: PITCH_WIDTH / 2, y: PITCH_HEIGHT / 2 },
     arrows: [],
-    freeDraws: [],
+    zones: [],
   };
+}
+
+const MIN_SHAPE_SIZE = 8;
+
+function buildZone(kind: ZoneKind, draft: ShapeDraft, color: string): ZoneData | null {
+  if (kind === 'rect') {
+    const rect = draftToRect(draft);
+    if (rect.width < MIN_SHAPE_SIZE || rect.height < MIN_SHAPE_SIZE) return null;
+    return { id: makeId('zone'), kind: 'rect', color, ...rect };
+  }
+  if (kind === 'ellipse') {
+    const ellipse = draftToEllipse(draft);
+    if (ellipse.radiusX < MIN_SHAPE_SIZE || ellipse.radiusY < MIN_SHAPE_SIZE) return null;
+    return { id: makeId('zone'), kind: 'ellipse', color, ...ellipse };
+  }
+  return null;
 }
 
 interface DrawingArrow {
@@ -50,7 +66,9 @@ export default function App() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [drawingArrow, setDrawingArrow] = useState<DrawingArrow | null>(null);
   const [freeDrawPoints, setFreeDrawPoints] = useState<number[] | null>(null);
+  const [shapeDraft, setShapeDraft] = useState<ShapeDraft | null>(null);
   const [highlightColor, setHighlightColor] = useState(DEFAULT_HIGHLIGHT_COLOR);
+  const [zoneShape, setZoneShape] = useState<ZoneKind>('freehand');
   const [schemeNames, setSchemeNames] = useState<string[]>([]);
   const [containerWidth, setContainerWidth] = useState(PITCH_WIDTH);
 
@@ -98,9 +116,9 @@ export default function App() {
     setBoard((b) => ({ ...b, arrows: [] }));
   }, [pushHistory]);
 
-  const handleClearFreeDraws = useCallback(() => {
+  const handleClearZones = useCallback(() => {
     pushHistory();
-    setBoard((b) => ({ ...b, freeDraws: [] }));
+    setBoard((b) => ({ ...b, zones: [] }));
   }, [pushHistory]);
 
   const findTokenIdAt = (target: Konva.Node): string | undefined => {
@@ -122,7 +140,11 @@ export default function App() {
     if (!pointer) return;
 
     if (mode === 'draw') {
-      setFreeDrawPoints([pointer.x, pointer.y]);
+      if (zoneShape === 'freehand') {
+        setFreeDrawPoints([pointer.x, pointer.y]);
+      } else {
+        setShapeDraft({ startX: pointer.x, startY: pointer.y, endX: pointer.x, endY: pointer.y });
+      }
       return;
     }
 
@@ -140,7 +162,7 @@ export default function App() {
   };
 
   const handlePointerMove = (e: Konva.KonvaEventObject<PointerEvent>) => {
-    if (!drawingArrow && !freeDrawPoints) return;
+    if (!drawingArrow && !freeDrawPoints && !shapeDraft) return;
     const stage = e.target.getStage();
     if (!stage) return;
     const pointer = getPointer(stage);
@@ -155,6 +177,11 @@ export default function App() {
       return;
     }
 
+    if (shapeDraft) {
+      setShapeDraft((d) => (d ? { ...d, endX: pointer.x, endY: pointer.y } : d));
+      return;
+    }
+
     setDrawingArrow((d) => (d ? { ...d, endX: pointer.x, endY: pointer.y } : d));
   };
 
@@ -164,8 +191,18 @@ export default function App() {
       setFreeDrawPoints(null);
       if (points.length < 4) return;
       pushHistory();
-      const zone: FreeDrawData = { id: makeId('zone'), points, color: highlightColor };
-      setBoard((b) => ({ ...b, freeDraws: [...b.freeDraws, zone] }));
+      const zone: ZoneData = { id: makeId('zone'), kind: 'freehand', points, color: highlightColor };
+      setBoard((b) => ({ ...b, zones: [...b.zones, zone] }));
+      return;
+    }
+
+    if (shapeDraft) {
+      const draft = shapeDraft;
+      setShapeDraft(null);
+      const zone = buildZone(zoneShape, draft, highlightColor);
+      if (!zone) return;
+      pushHistory();
+      setBoard((b) => ({ ...b, zones: [...b.zones, zone] }));
       return;
     }
 
@@ -192,7 +229,7 @@ export default function App() {
       setBoard((b) => ({
         ...b,
         arrows: b.arrows.filter((a) => a.id !== id),
-        freeDraws: b.freeDraws.filter((f) => f.id !== id),
+        zones: b.zones.filter((z) => z.id !== id),
       }));
     },
     [pushHistory],
@@ -273,7 +310,7 @@ export default function App() {
     const scheme = loadSchemes().find((s) => s.name === name);
     if (!scheme) return;
     pushHistory();
-    setBoard({ ...scheme.state, freeDraws: scheme.state.freeDraws ?? [] });
+    setBoard({ ...scheme.state, zones: scheme.state.zones ?? [] });
   }, [pushHistory]);
 
   const handleDeleteScheme = useCallback((name: string) => {
@@ -291,10 +328,20 @@ export default function App() {
     };
   }, [drawingArrow, mode]);
 
-  const previewZone: FreeDrawData | null = useMemo(() => {
-    if (!freeDrawPoints) return null;
-    return { id: 'preview-zone', points: freeDrawPoints, color: highlightColor };
-  }, [freeDrawPoints, highlightColor]);
+  const previewZone: ZoneData | null = useMemo(() => {
+    if (freeDrawPoints) {
+      return { id: 'preview-zone', kind: 'freehand', points: freeDrawPoints, color: highlightColor };
+    }
+    if (shapeDraft) {
+      if (zoneShape === 'rect') {
+        return { id: 'preview-zone', kind: 'rect', color: highlightColor, ...draftToRect(shapeDraft) };
+      }
+      if (zoneShape === 'ellipse') {
+        return { id: 'preview-zone', kind: 'ellipse', color: highlightColor, ...draftToEllipse(shapeDraft) };
+      }
+    }
+    return null;
+  }, [freeDrawPoints, shapeDraft, zoneShape, highlightColor]);
 
   return (
     <div className="app">
@@ -304,6 +351,8 @@ export default function App() {
         setMode={setMode}
         highlightColor={highlightColor}
         setHighlightColor={setHighlightColor}
+        zoneShape={zoneShape}
+        setZoneShape={setZoneShape}
         formationA={formationA}
         formationB={formationB}
         setFormationA={setFormationA}
@@ -314,7 +363,7 @@ export default function App() {
         onUndo={handleUndo}
         canUndo={canUndo}
         onClearArrows={handleClearArrows}
-        onClearFreeDraws={handleClearFreeDraws}
+        onClearZones={handleClearZones}
         schemeNames={schemeNames}
         onSave={handleSaveScheme}
         onLoad={handleLoadScheme}
@@ -334,10 +383,10 @@ export default function App() {
             <Pitch width={PITCH_WIDTH} height={PITCH_HEIGHT} />
           </Layer>
           <Layer>
-            {board.freeDraws.map((zone) => (
-              <FreeDrawShape key={zone.id} data={zone} erasable={mode === 'erase'} onClick={handleErase} />
+            {board.zones.map((zone) => (
+              <ZoneShape key={zone.id} data={zone} erasable={mode === 'erase'} onClick={handleErase} />
             ))}
-            {previewZone && <FreeDrawShape data={previewZone} erasable={false} />}
+            {previewZone && <ZoneShape data={previewZone} erasable={false} />}
           </Layer>
           <Layer>
             {board.arrows.map((arrow) => (
@@ -372,7 +421,8 @@ export default function App() {
       <p className="hint">
         Modalità "Muovi": trascina giocatori e palla. Modalità corsa/passaggio/dribbling: disegna una freccia da un
         giocatore (o dalla palla) verso la posizione di destinazione, poi premi Play per animare i movimenti.
-        Modalità "Zone": disegna a mano libera per evidenziare gli spazi di campo, scegliendo un colore.
+        Modalità "Zone": scegli una forma (libero, rettangolo o cerchio) e un colore, poi disegna sul campo per
+        evidenziare gli spazi.
       </p>
     </div>
   );

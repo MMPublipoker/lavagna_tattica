@@ -23,11 +23,35 @@ export interface ArrowData {
   targetId?: string;
 }
 
-export interface FreeDrawData {
+export type ZoneKind = 'freehand' | 'rect' | 'ellipse';
+
+interface ZoneBase {
   id: string;
-  points: number[];
   color: string;
 }
+
+export interface FreehandZoneData extends ZoneBase {
+  kind: 'freehand';
+  points: number[];
+}
+
+export interface RectZoneData extends ZoneBase {
+  kind: 'rect';
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface EllipseZoneData extends ZoneBase {
+  kind: 'ellipse';
+  x: number;
+  y: number;
+  radiusX: number;
+  radiusY: number;
+}
+
+export type ZoneData = FreehandZoneData | RectZoneData | EllipseZoneData;
 
 export type ToolMode = 'select' | 'run' | 'pass' | 'dribble' | 'draw' | 'erase';
 
@@ -37,7 +61,7 @@ export interface BoardState {
   players: PlayerData[];
   ball: BallData;
   arrows: ArrowData[];
-  freeDraws: FreeDrawData[];
+  zones: ZoneData[];
 }
 
 export interface SavedScheme {

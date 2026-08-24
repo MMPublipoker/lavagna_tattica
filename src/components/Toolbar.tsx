@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import type { Formation, ToolMode } from '../types';
+import type { Formation, ToolMode, ZoneKind } from '../types';
 
 interface ToolbarProps {
   mode: ToolMode;
   setMode: (mode: ToolMode) => void;
   highlightColor: string;
   setHighlightColor: (color: string) => void;
+  zoneShape: ZoneKind;
+  setZoneShape: (shape: ZoneKind) => void;
   formationA: Formation;
   formationB: Formation;
   setFormationA: (f: Formation) => void;
@@ -16,7 +18,7 @@ interface ToolbarProps {
   onUndo: () => void;
   canUndo: boolean;
   onClearArrows: () => void;
-  onClearFreeDraws: () => void;
+  onClearZones: () => void;
   schemeNames: string[];
   onSave: (name: string) => void;
   onLoad: (name: string) => void;
@@ -41,11 +43,19 @@ const HIGHLIGHT_COLORS: Array<{ color: string; label: string }> = [
   { color: '#51cf66', label: 'Pressing' },
 ];
 
+const ZONE_SHAPES: Array<{ kind: ZoneKind; label: string }> = [
+  { kind: 'freehand', label: '➰ Libero' },
+  { kind: 'rect', label: '▭ Rettangolo' },
+  { kind: 'ellipse', label: '⬭ Cerchio' },
+];
+
 export default function Toolbar({
   mode,
   setMode,
   highlightColor,
   setHighlightColor,
+  zoneShape,
+  setZoneShape,
   formationA,
   formationB,
   setFormationA,
@@ -56,7 +66,7 @@ export default function Toolbar({
   onUndo,
   canUndo,
   onClearArrows,
-  onClearFreeDraws,
+  onClearZones,
   schemeNames,
   onSave,
   onLoad,
@@ -81,17 +91,30 @@ export default function Toolbar({
           ))}
         </div>
         {mode === 'draw' && (
-          <div className="button-row">
-            {HIGHLIGHT_COLORS.map((c) => (
-              <button
-                key={c.color}
-                className={highlightColor === c.color ? 'swatch-btn active' : 'swatch-btn'}
-                style={{ backgroundColor: c.color }}
-                title={c.label}
-                onClick={() => setHighlightColor(c.color)}
-              />
-            ))}
-          </div>
+          <>
+            <div className="button-row">
+              {ZONE_SHAPES.map((s) => (
+                <button
+                  key={s.kind}
+                  className={zoneShape === s.kind ? 'tool-btn active' : 'tool-btn'}
+                  onClick={() => setZoneShape(s.kind)}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+            <div className="button-row">
+              {HIGHLIGHT_COLORS.map((c) => (
+                <button
+                  key={c.color}
+                  className={highlightColor === c.color ? 'swatch-btn active' : 'swatch-btn'}
+                  style={{ backgroundColor: c.color }}
+                  title={c.label}
+                  onClick={() => setHighlightColor(c.color)}
+                />
+              ))}
+            </div>
+          </>
         )}
       </div>
 
@@ -136,7 +159,7 @@ export default function Toolbar({
           <button className="tool-btn" onClick={onClearArrows}>
             ✕ Pulisci freccette
           </button>
-          <button className="tool-btn" onClick={onClearFreeDraws}>
+          <button className="tool-btn" onClick={onClearZones}>
             ✕ Pulisci zone
           </button>
         </div>
