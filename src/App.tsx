@@ -460,7 +460,7 @@ export default function App() {
 
     pushHistory();
     if (!sequenceStartSnapshot) setSequenceStartSnapshot(board);
-    setSequenceSteps((steps) => [...steps, { id: makeId('step'), arrows: board.arrows }]);
+    setSequenceSteps((steps) => [...steps, { id: makeId('step'), arrows: board.arrows, zones: board.zones }]);
 
     const moves = new Map<string, ArrowData>();
     for (const arrow of board.arrows) {
@@ -497,7 +497,7 @@ export default function App() {
     await nextAnimationFrame();
     await nextAnimationFrame();
     for (const step of sequenceSteps) {
-      setBoard((b) => ({ ...b, arrows: step.arrows }));
+      setBoard((b) => ({ ...b, arrows: step.arrows, zones: step.zones }));
       await nextAnimationFrame();
       await nextAnimationFrame();
       await animateArrows(step.arrows);
@@ -551,7 +551,7 @@ export default function App() {
     drawFrame();
 
     for (const step of sequenceSteps) {
-      setBoard((b) => ({ ...b, arrows: step.arrows }));
+      setBoard((b) => ({ ...b, arrows: step.arrows, zones: step.zones }));
       await nextAnimationFrame();
       await nextAnimationFrame();
       drawFrame();
