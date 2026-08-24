@@ -4,7 +4,7 @@ App web per disegnare schemi tattici di calcio: campo da gioco, giocatori delle 
 
 ## Funzionalità
 
-- Formazioni preimpostate (4-4-2, 4-3-3, 3-5-2) per entrambe le squadre
+- 13 formazioni preimpostate (4-4-2, 4-3-3, 3-5-2, 3-4-2-1, 4-3-2-1, 3-4-3, 4-2-3-1, 4-2-4, 4-1-4-1, 3-5-1-1, 3-4-1-2, 5-3-2, 5-4-1) per entrambe le squadre
 - Trascinamento di giocatori e palla sul campo
 - Disegno di freccette (corsa, passaggio, dribbling) associate a un giocatore o alla palla
 - Riproduzione dell'animazione dei movimenti disegnati

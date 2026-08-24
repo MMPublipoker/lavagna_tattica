@@ -1,19 +1,38 @@
 import type { Formation, PlayerData, Team } from './types';
 
-// All supported formations use the same shape: GK + 3 outfield lines
-// (defence, midfield, attack) with a different player count per line.
-const LINE_COUNTS: Record<Formation, [number, number, number]> = {
+// Each formation is described as an array of outfield line sizes (GK excluded),
+// ordered from the defensive line to the most advanced one. They must sum to 10.
+const LINE_COUNTS: Record<Formation, number[]> = {
   '4-4-2': [4, 4, 2],
   '4-3-3': [4, 3, 3],
   '3-5-2': [3, 5, 2],
+  '3-4-2-1': [3, 4, 2, 1],
+  '4-3-2-1': [4, 3, 2, 1],
+  '3-4-3': [3, 4, 3],
+  '4-2-3-1': [4, 2, 3, 1],
+  '4-2-4': [4, 2, 4],
+  '4-1-4-1': [4, 1, 4, 1],
+  '3-5-1-1': [3, 5, 1, 1],
+  '3-4-1-2': [3, 4, 1, 2],
+  '5-3-2': [5, 3, 2],
+  '5-4-1': [5, 4, 1],
 };
 
-// Fraction of pitch height for each line, for the team attacking upward (toward y = 0).
-const Y_FRACTIONS = { gk: 0.94, def: 0.8, mid: 0.6, fwd: 0.42 };
+const GK_Y_FRACTION = 0.94;
+const DEFENSIVE_LINE_Y_FRACTION = 0.82;
+const ATTACKING_LINE_Y_FRACTION = 0.4;
 
 function lineX(count: number, width: number, margin: number): number[] {
   const spread = width - margin * 2;
   return Array.from({ length: count }, (_, i) => margin + (spread * (i + 0.5)) / count);
+}
+
+// Spreads the outfield lines evenly between the defensive and attacking depth,
+// for any number of lines (3-line and 4-line formations alike).
+function lineYFractions(lineCount: number): number[] {
+  if (lineCount === 1) return [DEFENSIVE_LINE_Y_FRACTION];
+  const step = (DEFENSIVE_LINE_Y_FRACTION - ATTACKING_LINE_Y_FRACTION) / (lineCount - 1);
+  return Array.from({ length: lineCount }, (_, i) => DEFENSIVE_LINE_Y_FRACTION - i * step);
 }
 
 export function buildFormation(
@@ -22,7 +41,7 @@ export function buildFormation(
   width: number,
   height: number,
 ): PlayerData[] {
-  const [defCount, midCount, fwdCount] = LINE_COUNTS[formation];
+  const lineCounts = LINE_COUNTS[formation];
   const margin = width * 0.09;
   const mirror = team === 'B';
   const yFor = (frac: number) => (mirror ? 1 - frac : frac) * height;
@@ -30,22 +49,18 @@ export function buildFormation(
   const players: PlayerData[] = [];
   let shirt = 1;
 
-  players.push({ id: `${team}-${shirt}`, team, number: shirt, x: width / 2, y: yFor(Y_FRACTIONS.gk) });
+  players.push({ id: `${team}-${shirt}`, team, number: shirt, x: width / 2, y: yFor(GK_Y_FRACTION) });
   shirt += 1;
 
-  const lines: Array<{ count: number; yFrac: number }> = [
-    { count: defCount, yFrac: Y_FRACTIONS.def },
-    { count: midCount, yFrac: Y_FRACTIONS.mid },
-    { count: fwdCount, yFrac: Y_FRACTIONS.fwd },
-  ];
+  const yFractions = lineYFractions(lineCounts.length);
 
-  for (const line of lines) {
-    const xs = lineX(line.count, width, margin);
+  lineCounts.forEach((count, lineIndex) => {
+    const xs = lineX(count, width, margin);
     for (const x of xs) {
-      players.push({ id: `${team}-${shirt}`, team, number: shirt, x, y: yFor(line.yFrac) });
+      players.push({ id: `${team}-${shirt}`, team, number: shirt, x, y: yFor(yFractions[lineIndex]) });
       shirt += 1;
     }
-  }
+  });
 
   return players;
 }
