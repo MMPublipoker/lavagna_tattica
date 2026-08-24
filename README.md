@@ -9,6 +9,7 @@ App web per disegnare schemi tattici di calcio: campo da gioco, giocatori delle 
 - Disegno di freccette (corsa, passaggio, dribbling) associate a un giocatore o alla palla
 - Riproduzione dell'animazione dei movimenti disegnati
 - Zone di campo (libere, rettangoli o cerchi) per evidenziare gli spazi, con colori dedicati
+- Caricamento del preset di ogni squadra di Serie A (rosa, numeri, modulo base e colori sociali) per lato
 - Annulla ultima azione, pulizia freccette, reset formazione
 - Salvataggio e caricamento schemi (in locale, nel browser)
 

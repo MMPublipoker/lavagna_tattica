@@ -10,6 +10,11 @@ export function makeId(prefix: string): string {
   return `${prefix}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
+export function surname(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/);
+  return parts[parts.length - 1] ?? fullName;
+}
+
 export interface ShapeDraft {
   startX: number;
   startY: number;

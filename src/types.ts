@@ -4,6 +4,7 @@ export interface PlayerData {
   id: string;
   team: Team;
   number: number;
+  name?: string;
   x: number;
   y: number;
 }

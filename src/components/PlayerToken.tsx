@@ -1,10 +1,13 @@
 import type Konva from 'konva';
 import { Circle, Group, Text } from 'react-konva';
+import type { TokenColors } from '../teamColors';
 import type { PlayerData } from '../types';
+import { surname } from '../utils';
 
 interface PlayerTokenProps {
   data: PlayerData;
   radius: number;
+  colors: TokenColors;
   draggable: boolean;
   selected: boolean;
   onDragStart: () => void;
@@ -12,22 +15,16 @@ interface PlayerTokenProps {
   onDragEnd: () => void;
 }
 
-const TEAM_COLORS: Record<PlayerData['team'], { fill: string; stroke: string; text: string }> = {
-  A: { fill: '#1c7ed6', stroke: '#0b4a8f', text: '#ffffff' },
-  B: { fill: '#e03131', stroke: '#8a1f1f', text: '#ffffff' },
-};
-
 export default function PlayerToken({
   data,
   radius,
+  colors,
   draggable,
   selected,
   onDragStart,
   onDragMove,
   onDragEnd,
 }: PlayerTokenProps) {
-  const colors = TEAM_COLORS[data.team];
-
   const handleDragMove = (e: Konva.KonvaEventObject<DragEvent>) => {
     onDragMove(data.id, e.target.x(), e.target.y());
   };
@@ -66,6 +63,22 @@ export default function PlayerToken({
         verticalAlign="middle"
         listening={false}
       />
+      {data.name && (
+        <Text
+          text={surname(data.name)}
+          fontSize={radius * 0.62}
+          fontStyle="bold"
+          fill="#0b1f12"
+          stroke="#ffffff"
+          strokeWidth={2.5}
+          fillAfterStrokeEnabled
+          width={radius * 6}
+          offsetX={radius * 3}
+          y={radius + 3}
+          align="center"
+          listening={false}
+        />
+      )}
     </Group>
   );
 }

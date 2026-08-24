@@ -66,6 +66,12 @@
   cursor: not-allowed;
 }
 
+.team-loaded-hint {
+  font-size: 0.78rem;
+  color: #9aa0a6;
+  font-style: italic;
+}
+
 .swatch-btn {
   width: 28px;
   height: 28px;

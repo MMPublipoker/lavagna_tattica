@@ -8,9 +8,11 @@ import Pitch from './components/Pitch';
 import PlayerToken from './components/PlayerToken';
 import Toolbar from './components/Toolbar';
 import ZoneShape from './components/ZoneShape';
-import { buildFormation } from './formations';
+import { buildFormation, buildRealTeamFormation } from './formations';
 import { deleteScheme, loadSchemes, saveScheme } from './schemes';
-import type { ArrowData, ArrowStyle, BoardState, Formation, ToolMode, ZoneData, ZoneKind } from './types';
+import { SERIE_A_TEAMS } from './serieATeams';
+import { DEFAULT_TEAM_COLORS, tokenColorsFromTeamKit } from './teamColors';
+import type { ArrowData, ArrowStyle, BoardState, Formation, Team, ToolMode, ZoneData, ZoneKind } from './types';
 import { draftToEllipse, draftToRect, easeInOutQuad, lerp, makeId, type ShapeDraft } from './utils';
 
 const DEFAULT_HIGHLIGHT_COLOR = '#ffd43b';
@@ -72,6 +74,8 @@ export default function App() {
   const [zoneShape, setZoneShape] = useState<ZoneKind>('freehand');
   const [schemeNames, setSchemeNames] = useState<string[]>([]);
   const [containerWidth, setContainerWidth] = useState(PITCH_WIDTH);
+  const [realTeamAId, setRealTeamAId] = useState<string | null>(null);
+  const [realTeamBId, setRealTeamBId] = useState<string | null>(null);
 
   const historyRef = useRef<BoardState[]>([]);
   const [canUndo, setCanUndo] = useState(false);
@@ -94,6 +98,16 @@ export default function App() {
 
   const scale = Math.min(1, containerWidth / PITCH_WIDTH);
 
+  const colorsA = useMemo(() => {
+    const team = SERIE_A_TEAMS.find((t) => t.id === realTeamAId);
+    return team ? tokenColorsFromTeamKit(team.colorePrimario, team.coloreSecondario) : DEFAULT_TEAM_COLORS.A;
+  }, [realTeamAId]);
+
+  const colorsB = useMemo(() => {
+    const team = SERIE_A_TEAMS.find((t) => t.id === realTeamBId);
+    return team ? tokenColorsFromTeamKit(team.colorePrimario, team.coloreSecondario) : DEFAULT_TEAM_COLORS.B;
+  }, [realTeamBId]);
+
   const pushHistory = useCallback(() => {
     historyRef.current.push(board);
     if (historyRef.current.length > HISTORY_LIMIT) historyRef.current.shift();
@@ -109,8 +123,50 @@ export default function App() {
 
   const handleApplyFormations = useCallback(() => {
     pushHistory();
-    setBoard(initialState(formationA, formationB));
-  }, [formationA, formationB, pushHistory]);
+    const teamA = SERIE_A_TEAMS.find((t) => t.id === realTeamAId);
+    const teamB = SERIE_A_TEAMS.find((t) => t.id === realTeamBId);
+    setBoard({
+      players: [
+        teamA
+          ? buildRealTeamFormation('A', teamA, formationA, PITCH_WIDTH, PITCH_HEIGHT)
+          : buildFormation('A', formationA, PITCH_WIDTH, PITCH_HEIGHT),
+        teamB
+          ? buildRealTeamFormation('B', teamB, formationB, PITCH_WIDTH, PITCH_HEIGHT)
+          : buildFormation('B', formationB, PITCH_WIDTH, PITCH_HEIGHT),
+      ].flat(),
+      ball: { id: 'ball', x: PITCH_WIDTH / 2, y: PITCH_HEIGHT / 2 },
+      arrows: [],
+      zones: [],
+    });
+  }, [formationA, formationB, realTeamAId, realTeamBId, pushHistory]);
+
+  const handleApplyRealTeam = useCallback(
+    (slot: Team, teamId: string) => {
+      pushHistory();
+      const realTeam = SERIE_A_TEAMS.find((t) => t.id === teamId);
+      const formation = realTeam?.moduloBase ?? (slot === 'A' ? formationA : formationB);
+      const newPlayers = realTeam
+        ? buildRealTeamFormation(slot, realTeam, formation, PITCH_WIDTH, PITCH_HEIGHT)
+        : buildFormation(slot, formation, PITCH_WIDTH, PITCH_HEIGHT);
+
+      if (slot === 'A') {
+        setFormationA(formation);
+        setRealTeamAId(realTeam ? teamId : null);
+      } else {
+        setFormationB(formation);
+        setRealTeamBId(realTeam ? teamId : null);
+      }
+
+      setBoard((b) => ({
+        ...b,
+        players: [...b.players.filter((p) => p.team !== slot), ...newPlayers],
+        ball: { id: 'ball', x: PITCH_WIDTH / 2, y: PITCH_HEIGHT / 2 },
+        arrows: [],
+        zones: [],
+      }));
+    },
+    [formationA, formationB, pushHistory],
+  );
 
   const handleClearArrows = useCallback(() => {
     pushHistory();
@@ -366,6 +422,10 @@ export default function App() {
         setFormationA={setFormationA}
         setFormationB={setFormationB}
         onApplyFormations={handleApplyFormations}
+        realTeams={SERIE_A_TEAMS}
+        realTeamAId={realTeamAId}
+        realTeamBId={realTeamBId}
+        onApplyRealTeam={handleApplyRealTeam}
         onPlay={handlePlay}
         isPlaying={isPlaying}
         onUndo={handleUndo}
@@ -408,6 +468,7 @@ export default function App() {
                 key={p.id}
                 data={p}
                 radius={PLAYER_RADIUS}
+                colors={p.team === 'A' ? colorsA : colorsB}
                 draggable={mode === 'select' && !isPlaying}
                 selected={false}
                 onDragStart={handleTokenDragStart}
@@ -431,7 +492,8 @@ export default function App() {
         giocatore (o dalla palla) verso la posizione di destinazione, poi premi Play per animare i movimenti: a fine
         animazione la freccia usata si dissolve.
         Modalità "Zone": scegli una forma (libero, rettangolo o cerchio) e un colore, poi disegna sul campo per
-        evidenziare gli spazi.
+        evidenziare gli spazi. Nella sezione "Squadre Serie A" puoi caricare la rosa e i colori reali di una squadra
+        per lato.
       </p>
     </div>
   );

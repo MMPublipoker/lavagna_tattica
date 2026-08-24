@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import type { Formation, ToolMode, ZoneKind } from '../types';
+import type { RealTeam } from '../serieATeams';
+import type { Formation, Team, ToolMode, ZoneKind } from '../types';
 
 interface ToolbarProps {
   mode: ToolMode;
@@ -13,6 +14,10 @@ interface ToolbarProps {
   setFormationA: (f: Formation) => void;
   setFormationB: (f: Formation) => void;
   onApplyFormations: () => void;
+  realTeams: RealTeam[];
+  realTeamAId: string | null;
+  realTeamBId: string | null;
+  onApplyRealTeam: (slot: Team, teamId: string) => void;
   onPlay: () => void;
   isPlaying: boolean;
   onUndo: () => void;
@@ -75,6 +80,10 @@ export default function Toolbar({
   setFormationA,
   setFormationB,
   onApplyFormations,
+  realTeams,
+  realTeamAId,
+  realTeamBId,
+  onApplyRealTeam,
   onPlay,
   isPlaying,
   onUndo,
@@ -88,6 +97,9 @@ export default function Toolbar({
 }: ToolbarProps) {
   const [schemeName, setSchemeName] = useState('');
   const [selectedScheme, setSelectedScheme] = useState('');
+  const [pendingTeamA, setPendingTeamA] = useState('');
+  const [pendingTeamB, setPendingTeamB] = useState('');
+  const sortedRealTeams = [...realTeams].sort((a, b) => a.nome.localeCompare(b.nome));
 
   return (
     <div className="toolbar">
@@ -158,6 +170,44 @@ export default function Toolbar({
           <button className="tool-btn" onClick={onApplyFormations}>
             ↺ Reset posizioni
           </button>
+        </div>
+      </div>
+
+      <div className="toolbar-group">
+        <span className="toolbar-label">Squadre Serie A</span>
+        <div className="button-row">
+          <label className="team-label team-a">
+            Squadra A
+            <select value={pendingTeamA} onChange={(e) => setPendingTeamA(e.target.value)}>
+              <option value="">-- generica --</option>
+              {sortedRealTeams.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.nome}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button className="tool-btn" onClick={() => onApplyRealTeam('A', pendingTeamA)}>
+            📥 Carica
+          </button>
+          {realTeamAId && <span className="team-loaded-hint">{sortedRealTeams.find((t) => t.id === realTeamAId)?.nome}</span>}
+        </div>
+        <div className="button-row">
+          <label className="team-label team-b">
+            Squadra B
+            <select value={pendingTeamB} onChange={(e) => setPendingTeamB(e.target.value)}>
+              <option value="">-- generica --</option>
+              {sortedRealTeams.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.nome}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button className="tool-btn" onClick={() => onApplyRealTeam('B', pendingTeamB)}>
+            📥 Carica
+          </button>
+          {realTeamBId && <span className="team-loaded-hint">{sortedRealTeams.find((t) => t.id === realTeamBId)?.nome}</span>}
         </div>
       </div>
 
