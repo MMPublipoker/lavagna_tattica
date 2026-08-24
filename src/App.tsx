@@ -43,6 +43,38 @@ function nextAnimationFrame(): Promise<void> {
   return new Promise((resolve) => requestAnimationFrame(() => resolve()));
 }
 
+// Saves a generated file for the viewer. When running inside a host that exposes the
+// Claude Artifact "downloads" capability (e.g. this app's own preview), it hands the file
+// off through that capability's confirmation flow; everywhere else (the real deployed app)
+// it falls back to a standard blob download link.
+async function saveGeneratedFile(filename: string, blob: Blob): Promise<void> {
+  const claudeGlobal = (window as unknown as { claude?: { use?: (name: string) => Promise<unknown> } }).claude;
+  if (claudeGlobal?.use) {
+    try {
+      const downloads = (await claudeGlobal.use('downloads')) as
+        | { save: (req: { filename: string; data: Blob }) => Promise<unknown> }
+        | null;
+      if (downloads) {
+        await downloads.save({ filename, data: blob });
+        return;
+      }
+    } catch (err) {
+      const code = (err as { code?: string } | undefined)?.code;
+      if (code === 'declined') return;
+      console.warn('Download capability failed, falling back to a direct download link.', err);
+    }
+  }
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 function initialState(formationA: Formation, formationB: Formation): BoardState {
   return {
     players: [
@@ -530,15 +562,8 @@ export default function App() {
     await stopped;
 
     const blob = new Blob(chunks, { type: mimeType });
-    const url = URL.createObjectURL(blob);
     const extension = mimeType.includes('mp4') ? 'mp4' : 'webm';
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `lavagna-tattica-sequenza.${extension}`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    await saveGeneratedFile(`lavagna-tattica-sequenza.${extension}`, blob);
 
     setIsPlaying(false);
     setIsRecording(false);
