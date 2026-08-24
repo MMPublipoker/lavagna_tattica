@@ -4,13 +4,16 @@ import { Layer, Stage } from 'react-konva';
 import './App.css';
 import ArrowShape from './components/ArrowShape';
 import BallToken from './components/BallToken';
+import FreeDrawShape from './components/FreeDrawShape';
 import Pitch from './components/Pitch';
 import PlayerToken from './components/PlayerToken';
 import Toolbar from './components/Toolbar';
 import { buildFormation } from './formations';
 import { deleteScheme, loadSchemes, saveScheme } from './schemes';
-import type { ArrowData, BoardState, Formation, ToolMode } from './types';
+import type { ArrowData, ArrowStyle, BoardState, Formation, FreeDrawData, ToolMode } from './types';
 import { easeInOutQuad, lerp, makeId } from './utils';
+
+const DEFAULT_HIGHLIGHT_COLOR = '#ffd43b';
 
 const PITCH_WIDTH = 900;
 const PITCH_HEIGHT = 580;
@@ -27,6 +30,7 @@ function initialState(formationA: Formation, formationB: Formation): BoardState 
     ],
     ball: { id: 'ball', x: PITCH_WIDTH / 2, y: PITCH_HEIGHT / 2 },
     arrows: [],
+    freeDraws: [],
   };
 }
 
@@ -45,6 +49,8 @@ export default function App() {
   const [mode, setMode] = useState<ToolMode>('select');
   const [isPlaying, setIsPlaying] = useState(false);
   const [drawingArrow, setDrawingArrow] = useState<DrawingArrow | null>(null);
+  const [freeDrawPoints, setFreeDrawPoints] = useState<number[] | null>(null);
+  const [highlightColor, setHighlightColor] = useState(DEFAULT_HIGHLIGHT_COLOR);
   const [schemeNames, setSchemeNames] = useState<string[]>([]);
   const [containerWidth, setContainerWidth] = useState(PITCH_WIDTH);
 
@@ -92,6 +98,11 @@ export default function App() {
     setBoard((b) => ({ ...b, arrows: [] }));
   }, [pushHistory]);
 
+  const handleClearFreeDraws = useCallback(() => {
+    pushHistory();
+    setBoard((b) => ({ ...b, freeDraws: [] }));
+  }, [pushHistory]);
+
   const findTokenIdAt = (target: Konva.Node): string | undefined => {
     const group = target.findAncestor('.token', true) as Konva.Group | undefined;
     return group?.id();
@@ -110,6 +121,11 @@ export default function App() {
     const pointer = getPointer(stage);
     if (!pointer) return;
 
+    if (mode === 'draw') {
+      setFreeDrawPoints([pointer.x, pointer.y]);
+      return;
+    }
+
     const tokenId = findTokenIdAt(e.target);
     let startX = pointer.x;
     let startY = pointer.y;
@@ -124,15 +140,35 @@ export default function App() {
   };
 
   const handlePointerMove = (e: Konva.KonvaEventObject<PointerEvent>) => {
-    if (!drawingArrow) return;
+    if (!drawingArrow && !freeDrawPoints) return;
     const stage = e.target.getStage();
     if (!stage) return;
     const pointer = getPointer(stage);
     if (!pointer) return;
+
+    if (freeDrawPoints) {
+      const lastX = freeDrawPoints[freeDrawPoints.length - 2];
+      const lastY = freeDrawPoints[freeDrawPoints.length - 1];
+      if (Math.hypot(pointer.x - lastX, pointer.y - lastY) >= 3) {
+        setFreeDrawPoints([...freeDrawPoints, pointer.x, pointer.y]);
+      }
+      return;
+    }
+
     setDrawingArrow((d) => (d ? { ...d, endX: pointer.x, endY: pointer.y } : d));
   };
 
   const handlePointerUp = () => {
+    if (freeDrawPoints) {
+      const points = freeDrawPoints;
+      setFreeDrawPoints(null);
+      if (points.length < 4) return;
+      pushHistory();
+      const zone: FreeDrawData = { id: makeId('zone'), points, color: highlightColor };
+      setBoard((b) => ({ ...b, freeDraws: [...b.freeDraws, zone] }));
+      return;
+    }
+
     if (!drawingArrow) return;
     const { startX, startY, endX, endY, targetId } = drawingArrow;
     setDrawingArrow(null);
@@ -150,10 +186,14 @@ export default function App() {
     setBoard((b) => ({ ...b, arrows: [...b.arrows, arrow] }));
   };
 
-  const handleEraseArrow = useCallback(
+  const handleErase = useCallback(
     (id: string) => {
       pushHistory();
-      setBoard((b) => ({ ...b, arrows: b.arrows.filter((a) => a.id !== id) }));
+      setBoard((b) => ({
+        ...b,
+        arrows: b.arrows.filter((a) => a.id !== id),
+        freeDraws: b.freeDraws.filter((f) => f.id !== id),
+      }));
     },
     [pushHistory],
   );
@@ -233,7 +273,7 @@ export default function App() {
     const scheme = loadSchemes().find((s) => s.name === name);
     if (!scheme) return;
     pushHistory();
-    setBoard(scheme.state);
+    setBoard({ ...scheme.state, freeDraws: scheme.state.freeDraws ?? [] });
   }, [pushHistory]);
 
   const handleDeleteScheme = useCallback((name: string) => {
@@ -243,12 +283,18 @@ export default function App() {
 
   const previewArrow: ArrowData | null = useMemo(() => {
     if (!drawingArrow) return null;
+    const style: ArrowStyle = mode === 'run' || mode === 'pass' || mode === 'dribble' ? mode : 'run';
     return {
       id: 'preview',
       points: [drawingArrow.startX, drawingArrow.startY, drawingArrow.endX, drawingArrow.endY],
-      style: mode === 'select' || mode === 'erase' ? 'run' : mode,
+      style,
     };
   }, [drawingArrow, mode]);
+
+  const previewZone: FreeDrawData | null = useMemo(() => {
+    if (!freeDrawPoints) return null;
+    return { id: 'preview-zone', points: freeDrawPoints, color: highlightColor };
+  }, [freeDrawPoints, highlightColor]);
 
   return (
     <div className="app">
@@ -256,6 +302,8 @@ export default function App() {
       <Toolbar
         mode={mode}
         setMode={setMode}
+        highlightColor={highlightColor}
+        setHighlightColor={setHighlightColor}
         formationA={formationA}
         formationB={formationB}
         setFormationA={setFormationA}
@@ -266,6 +314,7 @@ export default function App() {
         onUndo={handleUndo}
         canUndo={canUndo}
         onClearArrows={handleClearArrows}
+        onClearFreeDraws={handleClearFreeDraws}
         schemeNames={schemeNames}
         onSave={handleSaveScheme}
         onLoad={handleLoadScheme}
@@ -285,8 +334,14 @@ export default function App() {
             <Pitch width={PITCH_WIDTH} height={PITCH_HEIGHT} />
           </Layer>
           <Layer>
+            {board.freeDraws.map((zone) => (
+              <FreeDrawShape key={zone.id} data={zone} erasable={mode === 'erase'} onClick={handleErase} />
+            ))}
+            {previewZone && <FreeDrawShape data={previewZone} erasable={false} />}
+          </Layer>
+          <Layer>
             {board.arrows.map((arrow) => (
-              <ArrowShape key={arrow.id} data={arrow} erasable={mode === 'erase'} onClick={handleEraseArrow} />
+              <ArrowShape key={arrow.id} data={arrow} erasable={mode === 'erase'} onClick={handleErase} />
             ))}
             {previewArrow && <ArrowShape data={previewArrow} erasable={false} />}
           </Layer>
@@ -317,6 +372,7 @@ export default function App() {
       <p className="hint">
         Modalità "Muovi": trascina giocatori e palla. Modalità corsa/passaggio/dribbling: disegna una freccia da un
         giocatore (o dalla palla) verso la posizione di destinazione, poi premi Play per animare i movimenti.
+        Modalità "Zone": disegna a mano libera per evidenziare gli spazi di campo, scegliendo un colore.
       </p>
     </div>
   );

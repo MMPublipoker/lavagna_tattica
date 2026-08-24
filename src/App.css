@@ -66,6 +66,20 @@
   cursor: not-allowed;
 }
 
+.swatch-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid #3a3f47;
+  cursor: pointer;
+  padding: 0;
+}
+
+.swatch-btn.active {
+  border-color: #ffffff;
+  box-shadow: 0 0 0 2px #1c7ed6;
+}
+
 .team-label {
   display: flex;
   align-items: center;

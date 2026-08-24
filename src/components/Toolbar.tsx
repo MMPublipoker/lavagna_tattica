@@ -4,6 +4,8 @@ import type { Formation, ToolMode } from '../types';
 interface ToolbarProps {
   mode: ToolMode;
   setMode: (mode: ToolMode) => void;
+  highlightColor: string;
+  setHighlightColor: (color: string) => void;
   formationA: Formation;
   formationB: Formation;
   setFormationA: (f: Formation) => void;
@@ -14,6 +16,7 @@ interface ToolbarProps {
   onUndo: () => void;
   canUndo: boolean;
   onClearArrows: () => void;
+  onClearFreeDraws: () => void;
   schemeNames: string[];
   onSave: (name: string) => void;
   onLoad: (name: string) => void;
@@ -27,12 +30,22 @@ const MODE_BUTTONS: Array<{ mode: ToolMode; label: string }> = [
   { mode: 'run', label: '➔ Corsa' },
   { mode: 'pass', label: '┄➔ Passaggio' },
   { mode: 'dribble', label: '〜➔ Dribbling' },
+  { mode: 'draw', label: '✏️ Zone' },
   { mode: 'erase', label: '🧹 Gomma' },
+];
+
+const HIGHLIGHT_COLORS: Array<{ color: string; label: string }> = [
+  { color: '#ffd43b', label: 'Spazio libero' },
+  { color: '#4dabf7', label: 'Squadra A' },
+  { color: '#ff6b6b', label: 'Squadra B' },
+  { color: '#51cf66', label: 'Pressing' },
 ];
 
 export default function Toolbar({
   mode,
   setMode,
+  highlightColor,
+  setHighlightColor,
   formationA,
   formationB,
   setFormationA,
@@ -43,6 +56,7 @@ export default function Toolbar({
   onUndo,
   canUndo,
   onClearArrows,
+  onClearFreeDraws,
   schemeNames,
   onSave,
   onLoad,
@@ -66,6 +80,19 @@ export default function Toolbar({
             </button>
           ))}
         </div>
+        {mode === 'draw' && (
+          <div className="button-row">
+            {HIGHLIGHT_COLORS.map((c) => (
+              <button
+                key={c.color}
+                className={highlightColor === c.color ? 'swatch-btn active' : 'swatch-btn'}
+                style={{ backgroundColor: c.color }}
+                title={c.label}
+                onClick={() => setHighlightColor(c.color)}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="toolbar-group">
@@ -108,6 +135,9 @@ export default function Toolbar({
           </button>
           <button className="tool-btn" onClick={onClearArrows}>
             ✕ Pulisci freccette
+          </button>
+          <button className="tool-btn" onClick={onClearFreeDraws}>
+            ✕ Pulisci zone
           </button>
         </div>
       </div>

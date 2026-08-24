@@ -23,7 +23,13 @@ export interface ArrowData {
   targetId?: string;
 }
 
-export type ToolMode = 'select' | 'run' | 'pass' | 'dribble' | 'erase';
+export interface FreeDrawData {
+  id: string;
+  points: number[];
+  color: string;
+}
+
+export type ToolMode = 'select' | 'run' | 'pass' | 'dribble' | 'draw' | 'erase';
 
 export type Formation = '4-4-2' | '4-3-3' | '3-5-2';
 
@@ -31,6 +37,7 @@ export interface BoardState {
   players: PlayerData[];
   ball: BallData;
   arrows: ArrowData[];
+  freeDraws: FreeDrawData[];
 }
 
 export interface SavedScheme {
