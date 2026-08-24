@@ -38,6 +38,7 @@ export default function ArrowShape({ data, onClick, erasable }: ArrowShapeProps)
       stroke={ARROW_COLOR}
       fill={ARROW_COLOR}
       strokeWidth={3}
+      opacity={data.opacity ?? 1}
       dash={dash}
       pointerLength={12}
       pointerWidth={12}

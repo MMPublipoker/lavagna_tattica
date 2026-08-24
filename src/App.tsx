@@ -20,6 +20,7 @@ const PITCH_HEIGHT = 580;
 const PLAYER_RADIUS = 16;
 const BALL_RADIUS = 8;
 const ANIMATION_DURATION_MS = 900;
+const ARROW_FADE_DURATION_MS = 600;
 const HISTORY_LIMIT = 50;
 
 function initialState(formationA: Formation, formationB: Formation): BoardState {
@@ -256,17 +257,22 @@ export default function App() {
     }
     if (moves.size === 0) return;
 
+    pushHistory();
+
     const startPositions = new Map<string, { x: number; y: number }>();
     for (const p of board.players) startPositions.set(p.id, { x: p.x, y: p.y });
     startPositions.set(board.ball.id, { x: board.ball.x, y: board.ball.y });
 
     setIsPlaying(true);
     const startTime = performance.now();
+    const totalDuration = ANIMATION_DURATION_MS + ARROW_FADE_DURATION_MS;
 
     const tick = (now: number) => {
       const elapsed = now - startTime;
-      const t = Math.min(1, elapsed / ANIMATION_DURATION_MS);
-      const eased = easeInOutQuad(t);
+      const moveT = Math.min(1, elapsed / ANIMATION_DURATION_MS);
+      const eased = easeInOutQuad(moveT);
+      const fadeT = Math.min(1, Math.max(0, elapsed - ANIMATION_DURATION_MS) / ARROW_FADE_DURATION_MS);
+      const arrowOpacity = 1 - fadeT;
 
       setBoard((b) => ({
         ...b,
@@ -282,17 +288,19 @@ export default function App() {
           if (!arrow || !start) return b.ball;
           return { ...b.ball, x: lerp(start.x, arrow.points[2], eased), y: lerp(start.y, arrow.points[3], eased) };
         })(),
+        arrows: b.arrows.map((a) => (a.targetId ? { ...a, opacity: arrowOpacity } : a)),
       }));
 
-      if (t < 1) {
+      if (elapsed < totalDuration) {
         rafRef.current = requestAnimationFrame(tick);
       } else {
         setIsPlaying(false);
+        setBoard((b) => ({ ...b, arrows: b.arrows.filter((a) => !a.targetId) }));
       }
     };
 
     rafRef.current = requestAnimationFrame(tick);
-  }, [board.arrows, board.ball, board.players]);
+  }, [board.arrows, board.ball, board.players, pushHistory]);
 
   useEffect(() => () => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -420,7 +428,8 @@ export default function App() {
       </div>
       <p className="hint">
         Modalità "Muovi": trascina giocatori e palla. Modalità corsa/passaggio/dribbling: disegna una freccia da un
-        giocatore (o dalla palla) verso la posizione di destinazione, poi premi Play per animare i movimenti.
+        giocatore (o dalla palla) verso la posizione di destinazione, poi premi Play per animare i movimenti: a fine
+        animazione la freccia usata si dissolve.
         Modalità "Zone": scegli una forma (libero, rettangolo o cerchio) e un colore, poi disegna sul campo per
         evidenziare gli spazi.
       </p>

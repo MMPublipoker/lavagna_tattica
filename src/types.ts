@@ -21,6 +21,7 @@ export interface ArrowData {
   points: [number, number, number, number];
   style: ArrowStyle;
   targetId?: string;
+  opacity?: number;
 }
 
 export type ZoneKind = 'freehand' | 'rect' | 'ellipse';
