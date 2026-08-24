@@ -39,6 +39,7 @@ const ANIMATION_DURATION_MS = 900;
 const ARROW_FADE_DURATION_MS = 600;
 const HISTORY_LIMIT = 50;
 const MAX_SEQUENCE_STEPS = 5;
+const MAX_PITCH_SCALE = 1.5;
 const RECORDING_FPS = 30;
 const VIDEO_MIME_CANDIDATES = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4'];
 
@@ -167,7 +168,7 @@ export default function App() {
     return () => observer.disconnect();
   }, []);
 
-  const scale = Math.min(1, containerWidth / PITCH_WIDTH);
+  const scale = Math.min(MAX_PITCH_SCALE, containerWidth / PITCH_WIDTH);
 
   useEffect(() => {
     if (mode !== 'select') setEditingPlayerId(null);
@@ -692,117 +693,124 @@ export default function App() {
   return (
     <div className="app">
       <h1>Lavagna Tattica Calcio</h1>
-      <Toolbar
-        mode={mode}
-        setMode={setMode}
-        highlightColor={highlightColor}
-        setHighlightColor={setHighlightColor}
-        zoneShape={zoneShape}
-        setZoneShape={setZoneShape}
-        penColor={penColor}
-        setPenColor={setPenColor}
-        formationA={formationA}
-        formationB={formationB}
-        setFormationA={setFormationA}
-        setFormationB={setFormationB}
-        onApplyFormations={handleApplyFormations}
-        realTeams={SERIE_A_TEAMS}
-        realTeamAId={realTeamAId}
-        realTeamBId={realTeamBId}
-        onApplyRealTeam={handleApplyRealTeam}
-        onPlay={handlePlay}
-        isPlaying={isPlaying}
-        onUndo={handleUndo}
-        canUndo={canUndo}
-        onClearArrows={handleClearArrows}
-        onClearZones={handleClearZones}
-        onClearPen={handleClearPen}
-        sequenceStepsCount={sequenceSteps.length}
-        maxSequenceSteps={MAX_SEQUENCE_STEPS}
-        canAddSequenceStep={sequenceSteps.length < MAX_SEQUENCE_STEPS && board.arrows.some((a) => a.targetId)}
-        onAddSequenceStep={handleAddSequenceStep}
-        onRemoveLastStep={handleRemoveLastStep}
-        onClearSequence={handleClearSequence}
-        onPlaySequence={handlePlaySequence}
-        onDownloadVideo={handleDownloadVideo}
-        isRecording={isRecording}
-        schemeNames={schemeNames}
-        onSave={handleSaveScheme}
-        onLoad={handleLoadScheme}
-        onDeleteScheme={handleDeleteScheme}
-      />
-      {editingPlayer && (
-        <PlayerEditor player={editingPlayer} onSave={handleSavePlayer} onClose={handleCloseEditor} />
-      )}
-      {isRecording && <p className="recording-indicator">🔴 Registrazione video in corso…</p>}
-      <div className="pitch-container" ref={containerRef}>
-        <Stage
-          ref={stageRef}
-          width={PITCH_WIDTH * scale}
-          height={PITCH_HEIGHT * scale}
-          scaleX={scale}
-          scaleY={scale}
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-        >
-          <Layer>
-            <Pitch width={PITCH_WIDTH} height={PITCH_HEIGHT} />
-          </Layer>
-          <Layer>
-            {board.zones.map((zone) => (
-              <ZoneShape key={zone.id} data={zone} erasable={mode === 'erase'} onClick={handleErase} />
-            ))}
-            {previewZone && <ZoneShape data={previewZone} erasable={false} />}
-          </Layer>
-          <Layer>
-            {board.arrows.map((arrow) => (
-              <ArrowShape key={arrow.id} data={arrow} erasable={mode === 'erase'} onClick={handleErase} />
-            ))}
-            {previewArrow && <ArrowShape data={previewArrow} erasable={false} />}
-          </Layer>
-          <Layer>
-            {board.players.map((p) => (
-              <PlayerToken
-                key={p.id}
-                data={p}
-                radius={PLAYER_RADIUS}
-                colors={p.team === 'A' ? colorsA : colorsB}
-                draggable={mode === 'select' && !isPlaying}
-                selected={p.id === editingPlayerId}
-                onSelect={mode === 'select' && !isPlaying ? handleSelectPlayer : undefined}
-                onDragStart={handleTokenDragStart}
-                onDragMove={handlePlayerDragMove}
-                onDragEnd={() => {}}
-              />
-            ))}
-            <BallToken
-              data={board.ball}
-              radius={BALL_RADIUS}
-              draggable={mode === 'select' && !isPlaying}
-              onDragStart={handleTokenDragStart}
-              onDragMove={handleBallDragMove}
-              onDragEnd={() => {}}
-            />
-          </Layer>
-          <Layer>
-            {board.penStrokes.map((stroke) => (
-              <PenStroke key={stroke.id} data={stroke} erasable={mode === 'erase'} onClick={handleErase} />
-            ))}
-            {previewPen && <PenStroke data={previewPen} erasable={false} />}
-          </Layer>
-        </Stage>
+      <div className="app-layout">
+        <div className="main-column">
+          {isRecording && <p className="recording-indicator">🔴 Registrazione video in corso…</p>}
+          <div className="pitch-container" ref={containerRef}>
+            <Stage
+              ref={stageRef}
+              width={PITCH_WIDTH * scale}
+              height={PITCH_HEIGHT * scale}
+              scaleX={scale}
+              scaleY={scale}
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+            >
+              <Layer>
+                <Pitch width={PITCH_WIDTH} height={PITCH_HEIGHT} />
+              </Layer>
+              <Layer>
+                {board.zones.map((zone) => (
+                  <ZoneShape key={zone.id} data={zone} erasable={mode === 'erase'} onClick={handleErase} />
+                ))}
+                {previewZone && <ZoneShape data={previewZone} erasable={false} />}
+              </Layer>
+              <Layer>
+                {board.arrows.map((arrow) => (
+                  <ArrowShape key={arrow.id} data={arrow} erasable={mode === 'erase'} onClick={handleErase} />
+                ))}
+                {previewArrow && <ArrowShape data={previewArrow} erasable={false} />}
+              </Layer>
+              <Layer>
+                {board.players.map((p) => (
+                  <PlayerToken
+                    key={p.id}
+                    data={p}
+                    radius={PLAYER_RADIUS}
+                    colors={p.team === 'A' ? colorsA : colorsB}
+                    draggable={mode === 'select' && !isPlaying}
+                    selected={p.id === editingPlayerId}
+                    onSelect={mode === 'select' && !isPlaying ? handleSelectPlayer : undefined}
+                    onDragStart={handleTokenDragStart}
+                    onDragMove={handlePlayerDragMove}
+                    onDragEnd={() => {}}
+                  />
+                ))}
+                <BallToken
+                  data={board.ball}
+                  radius={BALL_RADIUS}
+                  draggable={mode === 'select' && !isPlaying}
+                  onDragStart={handleTokenDragStart}
+                  onDragMove={handleBallDragMove}
+                  onDragEnd={() => {}}
+                />
+              </Layer>
+              <Layer>
+                {board.penStrokes.map((stroke) => (
+                  <PenStroke key={stroke.id} data={stroke} erasable={mode === 'erase'} onClick={handleErase} />
+                ))}
+                {previewPen && <PenStroke data={previewPen} erasable={false} />}
+              </Layer>
+            </Stage>
+          </div>
+          <p className="hint">
+            Modalità "Muovi": trascina giocatori e palla. Modalità corsa/passaggio/dribbling: disegna una freccia da
+            un giocatore (o dalla palla) verso la posizione di destinazione, poi premi Play per animare i movimenti:
+            a fine animazione la freccia usata si dissolve.
+            Modalità "Zone": scegli una forma (libero, rettangolo o cerchio) e un colore, poi disegna sul campo per
+            evidenziare gli spazi. Nella sezione "Squadre Serie A" puoi caricare la rosa e i colori reali di una
+            squadra per lato. In modalità "Muovi" clicca su un giocatore per modificarne nome e numero. Nella
+            sezione "Sequenza video" puoi disegnare fino a 5 fasi di movimento in successione, poi riprodurle tutte
+            di seguito o scaricarle come video. Modalità "Penna": scrivi o disegna a mano libera con un tratto
+            sottile, come con un pennarello.
+          </p>
+        </div>
+        <aside className="sidebar">
+          {editingPlayer && (
+            <PlayerEditor player={editingPlayer} onSave={handleSavePlayer} onClose={handleCloseEditor} />
+          )}
+          <Toolbar
+            mode={mode}
+            setMode={setMode}
+            highlightColor={highlightColor}
+            setHighlightColor={setHighlightColor}
+            zoneShape={zoneShape}
+            setZoneShape={setZoneShape}
+            penColor={penColor}
+            setPenColor={setPenColor}
+            formationA={formationA}
+            formationB={formationB}
+            setFormationA={setFormationA}
+            setFormationB={setFormationB}
+            onApplyFormations={handleApplyFormations}
+            realTeams={SERIE_A_TEAMS}
+            realTeamAId={realTeamAId}
+            realTeamBId={realTeamBId}
+            onApplyRealTeam={handleApplyRealTeam}
+            onPlay={handlePlay}
+            isPlaying={isPlaying}
+            onUndo={handleUndo}
+            canUndo={canUndo}
+            onClearArrows={handleClearArrows}
+            onClearZones={handleClearZones}
+            onClearPen={handleClearPen}
+            sequenceStepsCount={sequenceSteps.length}
+            maxSequenceSteps={MAX_SEQUENCE_STEPS}
+            canAddSequenceStep={sequenceSteps.length < MAX_SEQUENCE_STEPS && board.arrows.some((a) => a.targetId)}
+            onAddSequenceStep={handleAddSequenceStep}
+            onRemoveLastStep={handleRemoveLastStep}
+            onClearSequence={handleClearSequence}
+            onPlaySequence={handlePlaySequence}
+            onDownloadVideo={handleDownloadVideo}
+            isRecording={isRecording}
+            schemeNames={schemeNames}
+            onSave={handleSaveScheme}
+            onLoad={handleLoadScheme}
+            onDeleteScheme={handleDeleteScheme}
+          />
+        </aside>
       </div>
-      <p className="hint">
-        Modalità "Muovi": trascina giocatori e palla. Modalità corsa/passaggio/dribbling: disegna una freccia da un
-        giocatore (o dalla palla) verso la posizione di destinazione, poi premi Play per animare i movimenti: a fine
-        animazione la freccia usata si dissolve.
-        Modalità "Zone": scegli una forma (libero, rettangolo o cerchio) e un colore, poi disegna sul campo per
-        evidenziare gli spazi. Nella sezione "Squadre Serie A" puoi caricare la rosa e i colori reali di una squadra
-        per lato. In modalità "Muovi" clicca su un giocatore per modificarne nome e numero. Nella sezione "Sequenza
-        video" puoi disegnare fino a 5 fasi di movimento in successione, poi riprodurle tutte di seguito o scaricarle
-        come video. Modalità "Penna": scrivi o disegna a mano libera con un tratto sottile, come con un pennarello.
-      </p>
     </div>
   );
 }
