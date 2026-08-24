@@ -5,6 +5,7 @@ import './App.css';
 import ArrowShape from './components/ArrowShape';
 import BallToken from './components/BallToken';
 import Pitch from './components/Pitch';
+import PlayerEditor from './components/PlayerEditor';
 import PlayerToken from './components/PlayerToken';
 import Toolbar from './components/Toolbar';
 import ZoneShape from './components/ZoneShape';
@@ -76,6 +77,7 @@ export default function App() {
   const [containerWidth, setContainerWidth] = useState(PITCH_WIDTH);
   const [realTeamAId, setRealTeamAId] = useState<string | null>(null);
   const [realTeamBId, setRealTeamBId] = useState<string | null>(null);
+  const [editingPlayerId, setEditingPlayerId] = useState<string | null>(null);
 
   const historyRef = useRef<BoardState[]>([]);
   const [canUndo, setCanUndo] = useState(false);
@@ -97,6 +99,10 @@ export default function App() {
   }, []);
 
   const scale = Math.min(1, containerWidth / PITCH_WIDTH);
+
+  useEffect(() => {
+    if (mode !== 'select') setEditingPlayerId(null);
+  }, [mode]);
 
   const colorsA = useMemo(() => {
     const team = SERIE_A_TEAMS.find((t) => t.id === realTeamAId);
@@ -123,6 +129,7 @@ export default function App() {
 
   const handleApplyFormations = useCallback(() => {
     pushHistory();
+    setEditingPlayerId(null);
     const teamA = SERIE_A_TEAMS.find((t) => t.id === realTeamAId);
     const teamB = SERIE_A_TEAMS.find((t) => t.id === realTeamBId);
     setBoard({
@@ -143,6 +150,7 @@ export default function App() {
   const handleApplyRealTeam = useCallback(
     (slot: Team, teamId: string) => {
       pushHistory();
+      setEditingPlayerId(null);
       const realTeam = SERIE_A_TEAMS.find((t) => t.id === teamId);
       const formation = realTeam?.moduloBase ?? (slot === 'A' ? formationA : formationB);
       const newPlayers = realTeam
@@ -374,8 +382,33 @@ export default function App() {
     const scheme = loadSchemes().find((s) => s.name === name);
     if (!scheme) return;
     pushHistory();
+    setEditingPlayerId(null);
     setBoard({ ...scheme.state, zones: scheme.state.zones ?? [] });
   }, [pushHistory]);
+
+  const handleSelectPlayer = useCallback((id: string) => {
+    setEditingPlayerId(id);
+  }, []);
+
+  const handleCloseEditor = useCallback(() => {
+    setEditingPlayerId(null);
+  }, []);
+
+  const handleSavePlayer = useCallback(
+    (name: string, number: number) => {
+      if (!editingPlayerId) return;
+      pushHistory();
+      const trimmed = name.trim();
+      setBoard((b) => ({
+        ...b,
+        players: b.players.map((p) =>
+          p.id === editingPlayerId ? { ...p, name: trimmed || undefined, number } : p,
+        ),
+      }));
+      setEditingPlayerId(null);
+    },
+    [editingPlayerId, pushHistory],
+  );
 
   const handleDeleteScheme = useCallback((name: string) => {
     const updated = deleteScheme(name);
@@ -407,6 +440,8 @@ export default function App() {
     return null;
   }, [freeDrawPoints, shapeDraft, zoneShape, highlightColor]);
 
+  const editingPlayer = board.players.find((p) => p.id === editingPlayerId) ?? null;
+
   return (
     <div className="app">
       <h1>Lavagna Tattica Calcio</h1>
@@ -437,6 +472,9 @@ export default function App() {
         onLoad={handleLoadScheme}
         onDeleteScheme={handleDeleteScheme}
       />
+      {editingPlayer && (
+        <PlayerEditor player={editingPlayer} onSave={handleSavePlayer} onClose={handleCloseEditor} />
+      )}
       <div className="pitch-container" ref={containerRef}>
         <Stage
           width={PITCH_WIDTH * scale}
@@ -470,7 +508,8 @@ export default function App() {
                 radius={PLAYER_RADIUS}
                 colors={p.team === 'A' ? colorsA : colorsB}
                 draggable={mode === 'select' && !isPlaying}
-                selected={false}
+                selected={p.id === editingPlayerId}
+                onSelect={mode === 'select' && !isPlaying ? handleSelectPlayer : undefined}
                 onDragStart={handleTokenDragStart}
                 onDragMove={handlePlayerDragMove}
                 onDragEnd={() => {}}
@@ -493,7 +532,7 @@ export default function App() {
         animazione la freccia usata si dissolve.
         Modalità "Zone": scegli una forma (libero, rettangolo o cerchio) e un colore, poi disegna sul campo per
         evidenziare gli spazi. Nella sezione "Squadre Serie A" puoi caricare la rosa e i colori reali di una squadra
-        per lato.
+        per lato. In modalità "Muovi" clicca su un giocatore per modificarne nome e numero.
       </p>
     </div>
   );

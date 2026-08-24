@@ -10,6 +10,7 @@ interface PlayerTokenProps {
   colors: TokenColors;
   draggable: boolean;
   selected: boolean;
+  onSelect?: (id: string) => void;
   onDragStart: () => void;
   onDragMove: (id: string, x: number, y: number) => void;
   onDragEnd: () => void;
@@ -21,6 +22,7 @@ export default function PlayerToken({
   colors,
   draggable,
   selected,
+  onSelect,
   onDragStart,
   onDragMove,
   onDragEnd,
@@ -36,6 +38,8 @@ export default function PlayerToken({
       id={data.id}
       name="token"
       draggable={draggable}
+      onClick={onSelect ? () => onSelect(data.id) : undefined}
+      onTap={onSelect ? () => onSelect(data.id) : undefined}
       onDragStart={onDragStart}
       onDragMove={handleDragMove}
       onDragEnd={onDragEnd}

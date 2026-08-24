@@ -114,6 +114,20 @@
   font-size: 0.85rem;
 }
 
+.player-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  background: #1b1e23;
+  border: 1px solid #ffd43b;
+  border-radius: 8px;
+  padding: 0.75rem;
+}
+
+.player-editor-number {
+  width: 4.5rem;
+}
+
 .pitch-container {
   width: 100%;
   display: flex;
