@@ -18,21 +18,23 @@ const LINE_COUNTS: Record<Formation, number[]> = {
   '5-4-1': [5, 4, 1],
 };
 
-const GK_Y_FRACTION = 0.94;
-const DEFENSIVE_LINE_Y_FRACTION = 0.82;
-const ATTACKING_LINE_Y_FRACTION = 0.4;
+// The pitch is drawn horizontally (goals on the left/right), so "depth" — from
+// goalkeeper to attack — runs along x, and each line spreads out along y.
+const GK_X_FRACTION = 0.94;
+const DEFENSIVE_LINE_X_FRACTION = 0.82;
+const ATTACKING_LINE_X_FRACTION = 0.4;
 
-function lineX(count: number, width: number, margin: number): number[] {
-  const spread = width - margin * 2;
+function lineSpread(count: number, height: number, margin: number): number[] {
+  const spread = height - margin * 2;
   return Array.from({ length: count }, (_, i) => margin + (spread * (i + 0.5)) / count);
 }
 
 // Spreads the outfield lines evenly between the defensive and attacking depth,
 // for any number of lines (3-line and 4-line formations alike).
-function lineYFractions(lineCount: number): number[] {
-  if (lineCount === 1) return [DEFENSIVE_LINE_Y_FRACTION];
-  const step = (DEFENSIVE_LINE_Y_FRACTION - ATTACKING_LINE_Y_FRACTION) / (lineCount - 1);
-  return Array.from({ length: lineCount }, (_, i) => DEFENSIVE_LINE_Y_FRACTION - i * step);
+function lineXFractions(lineCount: number): number[] {
+  if (lineCount === 1) return [DEFENSIVE_LINE_X_FRACTION];
+  const step = (DEFENSIVE_LINE_X_FRACTION - ATTACKING_LINE_X_FRACTION) / (lineCount - 1);
+  return Array.from({ length: lineCount }, (_, i) => DEFENSIVE_LINE_X_FRACTION - i * step);
 }
 
 export function buildFormation(
@@ -42,22 +44,22 @@ export function buildFormation(
   height: number,
 ): PlayerData[] {
   const lineCounts = LINE_COUNTS[formation];
-  const margin = width * 0.09;
+  const margin = height * 0.09;
   const mirror = team === 'B';
-  const yFor = (frac: number) => (mirror ? 1 - frac : frac) * height;
+  const xFor = (frac: number) => (mirror ? 1 - frac : frac) * width;
 
   const players: PlayerData[] = [];
   let shirt = 1;
 
-  players.push({ id: `${team}-${shirt}`, team, number: shirt, x: width / 2, y: yFor(GK_Y_FRACTION) });
+  players.push({ id: `${team}-${shirt}`, team, number: shirt, x: xFor(GK_X_FRACTION), y: height / 2 });
   shirt += 1;
 
-  const yFractions = lineYFractions(lineCounts.length);
+  const xFractions = lineXFractions(lineCounts.length);
 
   lineCounts.forEach((count, lineIndex) => {
-    const xs = lineX(count, width, margin);
-    for (const x of xs) {
-      players.push({ id: `${team}-${shirt}`, team, number: shirt, x, y: yFor(yFractions[lineIndex]) });
+    const ys = lineSpread(count, height, margin);
+    for (const y of ys) {
+      players.push({ id: `${team}-${shirt}`, team, number: shirt, x: xFor(xFractions[lineIndex]), y });
       shirt += 1;
     }
   });

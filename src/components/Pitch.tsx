@@ -11,10 +11,10 @@ const LINE_WIDTH = 2;
 export default function Pitch({ width, height }: PitchProps) {
   const centerX = width / 2;
   const centerY = height / 2;
-  const penaltyAreaW = width * 0.44;
-  const penaltyAreaH = height * 0.18;
-  const goalAreaW = width * 0.22;
-  const goalAreaH = height * 0.07;
+  const penaltyAreaDepth = width * 0.16;
+  const penaltyAreaSpan = height * 0.62;
+  const goalAreaDepth = width * 0.06;
+  const goalAreaSpan = height * 0.3;
   const centerCircleR = height * 0.16;
 
   return (
@@ -28,42 +28,42 @@ export default function Pitch({ width, height }: PitchProps) {
         stroke={LINE_COLOR}
         strokeWidth={LINE_WIDTH}
       />
-      <Line points={[width * 0.03, centerY, width * 0.97, centerY]} stroke={LINE_COLOR} strokeWidth={LINE_WIDTH} />
+      <Line points={[centerX, height * 0.03, centerX, height * 0.97]} stroke={LINE_COLOR} strokeWidth={LINE_WIDTH} />
       <Circle x={centerX} y={centerY} radius={centerCircleR} stroke={LINE_COLOR} strokeWidth={LINE_WIDTH} />
       <Circle x={centerX} y={centerY} radius={3} fill={LINE_COLOR} />
 
-      {/* Top penalty & goal area */}
+      {/* Left penalty & goal area */}
       <Rect
-        x={centerX - penaltyAreaW / 2}
-        y={height * 0.03}
-        width={penaltyAreaW}
-        height={penaltyAreaH}
+        x={width * 0.03}
+        y={centerY - penaltyAreaSpan / 2}
+        width={penaltyAreaDepth}
+        height={penaltyAreaSpan}
         stroke={LINE_COLOR}
         strokeWidth={LINE_WIDTH}
       />
       <Rect
-        x={centerX - goalAreaW / 2}
-        y={height * 0.03}
-        width={goalAreaW}
-        height={goalAreaH}
+        x={width * 0.03}
+        y={centerY - goalAreaSpan / 2}
+        width={goalAreaDepth}
+        height={goalAreaSpan}
         stroke={LINE_COLOR}
         strokeWidth={LINE_WIDTH}
       />
 
-      {/* Bottom penalty & goal area */}
+      {/* Right penalty & goal area */}
       <Rect
-        x={centerX - penaltyAreaW / 2}
-        y={height * 0.97 - penaltyAreaH}
-        width={penaltyAreaW}
-        height={penaltyAreaH}
+        x={width * 0.97 - penaltyAreaDepth}
+        y={centerY - penaltyAreaSpan / 2}
+        width={penaltyAreaDepth}
+        height={penaltyAreaSpan}
         stroke={LINE_COLOR}
         strokeWidth={LINE_WIDTH}
       />
       <Rect
-        x={centerX - goalAreaW / 2}
-        y={height * 0.97 - goalAreaH}
-        width={goalAreaW}
-        height={goalAreaH}
+        x={width * 0.97 - goalAreaDepth}
+        y={centerY - goalAreaSpan / 2}
+        width={goalAreaDepth}
+        height={goalAreaSpan}
         stroke={LINE_COLOR}
         strokeWidth={LINE_WIDTH}
       />
