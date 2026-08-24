@@ -24,6 +24,15 @@ interface ToolbarProps {
   canUndo: boolean;
   onClearArrows: () => void;
   onClearZones: () => void;
+  sequenceStepsCount: number;
+  maxSequenceSteps: number;
+  canAddSequenceStep: boolean;
+  onAddSequenceStep: () => void;
+  onRemoveLastStep: () => void;
+  onClearSequence: () => void;
+  onPlaySequence: () => void;
+  onDownloadVideo: () => void;
+  isRecording: boolean;
   schemeNames: string[];
   onSave: (name: string) => void;
   onLoad: (name: string) => void;
@@ -90,6 +99,15 @@ export default function Toolbar({
   canUndo,
   onClearArrows,
   onClearZones,
+  sequenceStepsCount,
+  maxSequenceSteps,
+  canAddSequenceStep,
+  onAddSequenceStep,
+  onRemoveLastStep,
+  onClearSequence,
+  onPlaySequence,
+  onDownloadVideo,
+  isRecording,
   schemeNames,
   onSave,
   onLoad,
@@ -167,7 +185,7 @@ export default function Toolbar({
               ))}
             </select>
           </label>
-          <button className="tool-btn" onClick={onApplyFormations}>
+          <button className="tool-btn" onClick={onApplyFormations} disabled={isPlaying}>
             ↺ Reset posizioni
           </button>
         </div>
@@ -187,7 +205,7 @@ export default function Toolbar({
               ))}
             </select>
           </label>
-          <button className="tool-btn" onClick={() => onApplyRealTeam('A', pendingTeamA)}>
+          <button className="tool-btn" onClick={() => onApplyRealTeam('A', pendingTeamA)} disabled={isPlaying}>
             📥 Carica
           </button>
           {realTeamAId && <span className="team-loaded-hint">{sortedRealTeams.find((t) => t.id === realTeamAId)?.nome}</span>}
@@ -204,7 +222,7 @@ export default function Toolbar({
               ))}
             </select>
           </label>
-          <button className="tool-btn" onClick={() => onApplyRealTeam('B', pendingTeamB)}>
+          <button className="tool-btn" onClick={() => onApplyRealTeam('B', pendingTeamB)} disabled={isPlaying}>
             📥 Carica
           </button>
           {realTeamBId && <span className="team-loaded-hint">{sortedRealTeams.find((t) => t.id === realTeamBId)?.nome}</span>}
@@ -217,7 +235,7 @@ export default function Toolbar({
           <button className="tool-btn" onClick={onPlay} disabled={isPlaying}>
             ▶ Play
           </button>
-          <button className="tool-btn" onClick={onUndo} disabled={!canUndo}>
+          <button className="tool-btn" onClick={onUndo} disabled={!canUndo || isPlaying}>
             ⤺ Annulla
           </button>
           <button className="tool-btn" onClick={onClearArrows}>
@@ -225,6 +243,48 @@ export default function Toolbar({
           </button>
           <button className="tool-btn" onClick={onClearZones}>
             ✕ Pulisci zone
+          </button>
+        </div>
+      </div>
+
+      <div className="toolbar-group">
+        <span className="toolbar-label">Sequenza video</span>
+        <div className="button-row">
+          <span className="team-loaded-hint">
+            Fase {sequenceStepsCount}/{maxSequenceSteps}
+          </span>
+          <button className="tool-btn" onClick={onAddSequenceStep} disabled={!canAddSequenceStep || isRecording}>
+            ➕ Aggiungi fase
+          </button>
+          <button
+            className="tool-btn"
+            onClick={onRemoveLastStep}
+            disabled={sequenceStepsCount === 0 || isRecording}
+          >
+            ↩︎ Rimuovi ultima
+          </button>
+          <button
+            className="tool-btn"
+            onClick={onClearSequence}
+            disabled={sequenceStepsCount === 0 || isRecording}
+          >
+            🗑️ Svuota sequenza
+          </button>
+        </div>
+        <div className="button-row">
+          <button
+            className="tool-btn"
+            onClick={onPlaySequence}
+            disabled={sequenceStepsCount === 0 || isRecording}
+          >
+            🎬 Play sequenza
+          </button>
+          <button
+            className="tool-btn"
+            onClick={onDownloadVideo}
+            disabled={sequenceStepsCount === 0 || isRecording}
+          >
+            ⬇️ Scarica video
           </button>
         </div>
       </div>

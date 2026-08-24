@@ -79,6 +79,11 @@ export interface BoardState {
   zones: ZoneData[];
 }
 
+export interface SequenceStep {
+  id: string;
+  arrows: ArrowData[];
+}
+
 export interface SavedScheme {
   name: string;
   savedAt: string;

@@ -128,6 +128,13 @@
   width: 4.5rem;
 }
 
+.recording-indicator {
+  text-align: center;
+  color: #ff6b6b;
+  font-weight: 600;
+  margin: 0;
+}
+
 .pitch-container {
   width: 100%;
   display: flex;

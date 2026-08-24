@@ -13,7 +13,17 @@ import { buildFormation, buildRealTeamFormation } from './formations';
 import { deleteScheme, loadSchemes, saveScheme } from './schemes';
 import { SERIE_A_TEAMS } from './serieATeams';
 import { DEFAULT_TEAM_COLORS, tokenColorsFromTeamKit } from './teamColors';
-import type { ArrowData, ArrowStyle, BoardState, Formation, Team, ToolMode, ZoneData, ZoneKind } from './types';
+import type {
+  ArrowData,
+  ArrowStyle,
+  BoardState,
+  Formation,
+  SequenceStep,
+  Team,
+  ToolMode,
+  ZoneData,
+  ZoneKind,
+} from './types';
 import { draftToEllipse, draftToRect, easeInOutQuad, lerp, makeId, type ShapeDraft } from './utils';
 
 const DEFAULT_HIGHLIGHT_COLOR = '#ffd43b';
@@ -25,6 +35,13 @@ const BALL_RADIUS = 8;
 const ANIMATION_DURATION_MS = 900;
 const ARROW_FADE_DURATION_MS = 600;
 const HISTORY_LIMIT = 50;
+const MAX_SEQUENCE_STEPS = 5;
+const RECORDING_FPS = 30;
+const VIDEO_MIME_CANDIDATES = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4'];
+
+function nextAnimationFrame(): Promise<void> {
+  return new Promise((resolve) => requestAnimationFrame(() => resolve()));
+}
 
 function initialState(formationA: Formation, formationB: Formation): BoardState {
   return {
@@ -54,6 +71,12 @@ function buildZone(kind: ZoneKind, draft: ShapeDraft, color: string): ZoneData |
   return null;
 }
 
+interface HistoryEntry {
+  board: BoardState;
+  sequenceSteps: SequenceStep[];
+  sequenceStartSnapshot: BoardState | null;
+}
+
 interface DrawingArrow {
   startX: number;
   startY: number;
@@ -78,10 +101,18 @@ export default function App() {
   const [realTeamAId, setRealTeamAId] = useState<string | null>(null);
   const [realTeamBId, setRealTeamBId] = useState<string | null>(null);
   const [editingPlayerId, setEditingPlayerId] = useState<string | null>(null);
+  const [sequenceSteps, setSequenceSteps] = useState<SequenceStep[]>([]);
+  const [sequenceStartSnapshot, setSequenceStartSnapshot] = useState<BoardState | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
 
-  const historyRef = useRef<BoardState[]>([]);
+  const historyRef = useRef<HistoryEntry[]>([]);
   const [canUndo, setCanUndo] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const stageRef = useRef<Konva.Stage | null>(null);
+  const boardRef = useRef(board);
+  useEffect(() => {
+    boardRef.current = board;
+  }, [board]);
 
   useEffect(() => {
     setSchemeNames(loadSchemes().map((s) => s.name));
@@ -115,21 +146,25 @@ export default function App() {
   }, [realTeamBId]);
 
   const pushHistory = useCallback(() => {
-    historyRef.current.push(board);
+    historyRef.current.push({ board, sequenceSteps, sequenceStartSnapshot });
     if (historyRef.current.length > HISTORY_LIMIT) historyRef.current.shift();
     setCanUndo(true);
-  }, [board]);
+  }, [board, sequenceSteps, sequenceStartSnapshot]);
 
   const handleUndo = useCallback(() => {
     const previous = historyRef.current.pop();
     if (!previous) return;
-    setBoard(previous);
+    setBoard(previous.board);
+    setSequenceSteps(previous.sequenceSteps);
+    setSequenceStartSnapshot(previous.sequenceStartSnapshot);
     setCanUndo(historyRef.current.length > 0);
   }, []);
 
   const handleApplyFormations = useCallback(() => {
     pushHistory();
     setEditingPlayerId(null);
+    setSequenceSteps([]);
+    setSequenceStartSnapshot(null);
     const teamA = SERIE_A_TEAMS.find((t) => t.id === realTeamAId);
     const teamB = SERIE_A_TEAMS.find((t) => t.id === realTeamBId);
     setBoard({
@@ -151,6 +186,8 @@ export default function App() {
     (slot: Team, teamId: string) => {
       pushHistory();
       setEditingPlayerId(null);
+      setSequenceSteps([]);
+      setSequenceStartSnapshot(null);
       const realTeam = SERIE_A_TEAMS.find((t) => t.id === teamId);
       const formation = realTeam?.moduloBase ?? (slot === 'A' ? formationA : formationB);
       const newPlayers = realTeam
@@ -314,61 +351,198 @@ export default function App() {
 
   const rafRef = useRef<number | null>(null);
 
-  const handlePlay = useCallback(() => {
-    const moves = new Map<string, ArrowData>();
-    for (const arrow of board.arrows) {
-      if (arrow.targetId) moves.set(arrow.targetId, arrow);
-    }
-    if (moves.size === 0) return;
-
-    pushHistory();
-
-    const startPositions = new Map<string, { x: number; y: number }>();
-    for (const p of board.players) startPositions.set(p.id, { x: p.x, y: p.y });
-    startPositions.set(board.ball.id, { x: board.ball.x, y: board.ball.y });
-
-    setIsPlaying(true);
-    const startTime = performance.now();
-    const totalDuration = ANIMATION_DURATION_MS + ARROW_FADE_DURATION_MS;
-
-    const tick = (now: number) => {
-      const elapsed = now - startTime;
-      const moveT = Math.min(1, elapsed / ANIMATION_DURATION_MS);
-      const eased = easeInOutQuad(moveT);
-      const fadeT = Math.min(1, Math.max(0, elapsed - ANIMATION_DURATION_MS) / ARROW_FADE_DURATION_MS);
-      const arrowOpacity = 1 - fadeT;
-
-      setBoard((b) => ({
-        ...b,
-        players: b.players.map((p) => {
-          const arrow = moves.get(p.id);
-          const start = startPositions.get(p.id);
-          if (!arrow || !start) return p;
-          return { ...p, x: lerp(start.x, arrow.points[2], eased), y: lerp(start.y, arrow.points[3], eased) };
-        }),
-        ball: (() => {
-          const arrow = moves.get(b.ball.id);
-          const start = startPositions.get(b.ball.id);
-          if (!arrow || !start) return b.ball;
-          return { ...b.ball, x: lerp(start.x, arrow.points[2], eased), y: lerp(start.y, arrow.points[3], eased) };
-        })(),
-        arrows: b.arrows.map((a) => (a.targetId ? { ...a, opacity: arrowOpacity } : a)),
-      }));
-
-      if (elapsed < totalDuration) {
-        rafRef.current = requestAnimationFrame(tick);
-      } else {
-        setIsPlaying(false);
-        setBoard((b) => ({ ...b, arrows: b.arrows.filter((a) => !a.targetId) }));
+  // Animates every arrow with a target from the CURRENT board (read via boardRef, so this
+  // stays correct even when called repeatedly across an awaited multi-step sequence), fading
+  // the used arrows out at the end. `onFrame` lets a caller grab a snapshot for video recording.
+  const animateArrows = useCallback((arrows: ArrowData[], onFrame?: () => void): Promise<void> => {
+    return new Promise((resolve) => {
+      const moves = new Map<string, ArrowData>();
+      for (const arrow of arrows) {
+        if (arrow.targetId) moves.set(arrow.targetId, arrow);
       }
-    };
+      if (moves.size === 0) {
+        resolve();
+        return;
+      }
 
-    rafRef.current = requestAnimationFrame(tick);
-  }, [board.arrows, board.ball, board.players, pushHistory]);
+      const current = boardRef.current;
+      const startPositions = new Map<string, { x: number; y: number }>();
+      for (const p of current.players) startPositions.set(p.id, { x: p.x, y: p.y });
+      startPositions.set(current.ball.id, { x: current.ball.x, y: current.ball.y });
+
+      const startTime = performance.now();
+      const totalDuration = ANIMATION_DURATION_MS + ARROW_FADE_DURATION_MS;
+
+      const tick = (now: number) => {
+        const elapsed = now - startTime;
+        const moveT = Math.min(1, elapsed / ANIMATION_DURATION_MS);
+        const eased = easeInOutQuad(moveT);
+        const fadeT = Math.min(1, Math.max(0, elapsed - ANIMATION_DURATION_MS) / ARROW_FADE_DURATION_MS);
+        const arrowOpacity = 1 - fadeT;
+
+        setBoard((b) => ({
+          ...b,
+          players: b.players.map((p) => {
+            const arrow = moves.get(p.id);
+            const start = startPositions.get(p.id);
+            if (!arrow || !start) return p;
+            return { ...p, x: lerp(start.x, arrow.points[2], eased), y: lerp(start.y, arrow.points[3], eased) };
+          }),
+          ball: (() => {
+            const arrow = moves.get(b.ball.id);
+            const start = startPositions.get(b.ball.id);
+            if (!arrow || !start) return b.ball;
+            return { ...b.ball, x: lerp(start.x, arrow.points[2], eased), y: lerp(start.y, arrow.points[3], eased) };
+          })(),
+          arrows: b.arrows.map((a) => (a.targetId ? { ...a, opacity: arrowOpacity } : a)),
+        }));
+        onFrame?.();
+
+        if (elapsed < totalDuration) {
+          rafRef.current = requestAnimationFrame(tick);
+        } else {
+          setBoard((b) => ({ ...b, arrows: b.arrows.filter((a) => !a.targetId) }));
+          onFrame?.();
+          resolve();
+        }
+      };
+
+      rafRef.current = requestAnimationFrame(tick);
+    });
+  }, []);
 
   useEffect(() => () => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
   }, []);
+
+  const handlePlay = useCallback(() => {
+    if (!board.arrows.some((a) => a.targetId)) return;
+    pushHistory();
+    setIsPlaying(true);
+    animateArrows(board.arrows).then(() => setIsPlaying(false));
+  }, [board.arrows, pushHistory, animateArrows]);
+
+  const handleAddSequenceStep = useCallback(() => {
+    if (sequenceSteps.length >= MAX_SEQUENCE_STEPS) return;
+    if (!board.arrows.some((a) => a.targetId)) return;
+
+    pushHistory();
+    if (!sequenceStartSnapshot) setSequenceStartSnapshot(board);
+    setSequenceSteps((steps) => [...steps, { id: makeId('step'), arrows: board.arrows }]);
+
+    const moves = new Map<string, ArrowData>();
+    for (const arrow of board.arrows) {
+      if (arrow.targetId) moves.set(arrow.targetId, arrow);
+    }
+    setBoard((b) => ({
+      ...b,
+      players: b.players.map((p) => {
+        const arrow = moves.get(p.id);
+        return arrow ? { ...p, x: arrow.points[2], y: arrow.points[3] } : p;
+      }),
+      ball: (() => {
+        const arrow = moves.get(b.ball.id);
+        return arrow ? { ...b.ball, x: arrow.points[2], y: arrow.points[3] } : b.ball;
+      })(),
+      arrows: [],
+    }));
+  }, [board, sequenceSteps.length, sequenceStartSnapshot, pushHistory]);
+
+  const handleRemoveLastStep = useCallback(() => {
+    setSequenceSteps((steps) => steps.slice(0, -1));
+  }, []);
+
+  const handleClearSequence = useCallback(() => {
+    setSequenceSteps([]);
+    setSequenceStartSnapshot(null);
+  }, []);
+
+  const handlePlaySequence = useCallback(async () => {
+    if (sequenceSteps.length === 0 || !sequenceStartSnapshot) return;
+    pushHistory();
+    setIsPlaying(true);
+    setBoard({ ...sequenceStartSnapshot, arrows: [] });
+    await nextAnimationFrame();
+    await nextAnimationFrame();
+    for (const step of sequenceSteps) {
+      setBoard((b) => ({ ...b, arrows: step.arrows }));
+      await nextAnimationFrame();
+      await nextAnimationFrame();
+      await animateArrows(step.arrows);
+    }
+    setIsPlaying(false);
+  }, [sequenceSteps, sequenceStartSnapshot, pushHistory, animateArrows]);
+
+  const handleDownloadVideo = useCallback(async () => {
+    const stage = stageRef.current;
+    if (sequenceSteps.length === 0 || !sequenceStartSnapshot || !stage) return;
+    if (typeof MediaRecorder === 'undefined') {
+      window.alert('Il download video non è supportato in questo browser.');
+      return;
+    }
+    const mimeType = VIDEO_MIME_CANDIDATES.find((m) => MediaRecorder.isTypeSupported(m));
+    if (!mimeType) {
+      window.alert('Il download video non è supportato in questo browser.');
+      return;
+    }
+
+    const recordCanvas = document.createElement('canvas');
+    recordCanvas.width = stage.width();
+    recordCanvas.height = stage.height();
+    const ctx = recordCanvas.getContext('2d');
+    if (!ctx) return;
+
+    const drawFrame = () => {
+      const merged = stage.toCanvas();
+      ctx.clearRect(0, 0, recordCanvas.width, recordCanvas.height);
+      ctx.drawImage(merged, 0, 0);
+    };
+
+    const stream = recordCanvas.captureStream(RECORDING_FPS);
+    const recorder = new MediaRecorder(stream, { mimeType });
+    const chunks: BlobPart[] = [];
+    recorder.ondataavailable = (e) => {
+      if (e.data.size > 0) chunks.push(e.data);
+    };
+    const stopped = new Promise<void>((resolve) => {
+      recorder.onstop = () => resolve();
+    });
+
+    pushHistory();
+    setIsRecording(true);
+    setIsPlaying(true);
+    setBoard({ ...sequenceStartSnapshot, arrows: [] });
+    drawFrame();
+    recorder.start();
+    await nextAnimationFrame();
+    await nextAnimationFrame();
+    drawFrame();
+
+    for (const step of sequenceSteps) {
+      setBoard((b) => ({ ...b, arrows: step.arrows }));
+      await nextAnimationFrame();
+      await nextAnimationFrame();
+      drawFrame();
+      await animateArrows(step.arrows, drawFrame);
+    }
+
+    recorder.stop();
+    await stopped;
+
+    const blob = new Blob(chunks, { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const extension = mimeType.includes('mp4') ? 'mp4' : 'webm';
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `lavagna-tattica-sequenza.${extension}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+    setIsPlaying(false);
+    setIsRecording(false);
+  }, [sequenceSteps, sequenceStartSnapshot, pushHistory, animateArrows]);
 
   const handleSaveScheme = useCallback(
     (name: string) => {
@@ -383,6 +557,8 @@ export default function App() {
     if (!scheme) return;
     pushHistory();
     setEditingPlayerId(null);
+    setSequenceSteps([]);
+    setSequenceStartSnapshot(null);
     setBoard({ ...scheme.state, zones: scheme.state.zones ?? [] });
   }, [pushHistory]);
 
@@ -467,6 +643,15 @@ export default function App() {
         canUndo={canUndo}
         onClearArrows={handleClearArrows}
         onClearZones={handleClearZones}
+        sequenceStepsCount={sequenceSteps.length}
+        maxSequenceSteps={MAX_SEQUENCE_STEPS}
+        canAddSequenceStep={sequenceSteps.length < MAX_SEQUENCE_STEPS && board.arrows.some((a) => a.targetId)}
+        onAddSequenceStep={handleAddSequenceStep}
+        onRemoveLastStep={handleRemoveLastStep}
+        onClearSequence={handleClearSequence}
+        onPlaySequence={handlePlaySequence}
+        onDownloadVideo={handleDownloadVideo}
+        isRecording={isRecording}
         schemeNames={schemeNames}
         onSave={handleSaveScheme}
         onLoad={handleLoadScheme}
@@ -475,8 +660,10 @@ export default function App() {
       {editingPlayer && (
         <PlayerEditor player={editingPlayer} onSave={handleSavePlayer} onClose={handleCloseEditor} />
       )}
+      {isRecording && <p className="recording-indicator">🔴 Registrazione video in corso…</p>}
       <div className="pitch-container" ref={containerRef}>
         <Stage
+          ref={stageRef}
           width={PITCH_WIDTH * scale}
           height={PITCH_HEIGHT * scale}
           scaleX={scale}
@@ -532,7 +719,9 @@ export default function App() {
         animazione la freccia usata si dissolve.
         Modalità "Zone": scegli una forma (libero, rettangolo o cerchio) e un colore, poi disegna sul campo per
         evidenziare gli spazi. Nella sezione "Squadre Serie A" puoi caricare la rosa e i colori reali di una squadra
-        per lato. In modalità "Muovi" clicca su un giocatore per modificarne nome e numero.
+        per lato. In modalità "Muovi" clicca su un giocatore per modificarne nome e numero. Nella sezione "Sequenza
+        video" puoi disegnare fino a 5 fasi di movimento in successione, poi riprodurle tutte di seguito o scaricarle
+        come video.
       </p>
     </div>
   );
