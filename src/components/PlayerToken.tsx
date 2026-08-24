@@ -59,7 +59,7 @@ export default function PlayerToken({
       <Text
         text={String(data.number)}
         fontSize={radius}
-        fontStyle="bold"
+        fontFamily={nameFontFamily}
         fill={colors.text}
         width={radius * 2}
         height={radius * 2}
