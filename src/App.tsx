@@ -6,6 +6,7 @@ import ArrowShape from './components/ArrowShape';
 import BallToken from './components/BallToken';
 import Pitch from './components/Pitch';
 import PlayerEditor from './components/PlayerEditor';
+import PenStroke from './components/PenStroke';
 import PlayerToken from './components/PlayerToken';
 import Toolbar from './components/Toolbar';
 import ZoneShape from './components/ZoneShape';
@@ -18,6 +19,7 @@ import type {
   ArrowStyle,
   BoardState,
   Formation,
+  PenStrokeData,
   SequenceStep,
   Team,
   ToolMode,
@@ -27,6 +29,7 @@ import type {
 import { draftToEllipse, draftToRect, easeInOutQuad, lerp, makeId, type ShapeDraft } from './utils';
 
 const DEFAULT_HIGHLIGHT_COLOR = '#ffd43b';
+const DEFAULT_PEN_COLOR = '#ffffff';
 
 const PITCH_WIDTH = 900;
 const PITCH_HEIGHT = 580;
@@ -84,6 +87,7 @@ function initialState(formationA: Formation, formationB: Formation): BoardState 
     ball: { id: 'ball', x: PITCH_WIDTH / 2, y: PITCH_HEIGHT / 2 },
     arrows: [],
     zones: [],
+    penStrokes: [],
   };
 }
 
@@ -128,6 +132,8 @@ export default function App() {
   const [shapeDraft, setShapeDraft] = useState<ShapeDraft | null>(null);
   const [highlightColor, setHighlightColor] = useState(DEFAULT_HIGHLIGHT_COLOR);
   const [zoneShape, setZoneShape] = useState<ZoneKind>('freehand');
+  const [penColor, setPenColor] = useState(DEFAULT_PEN_COLOR);
+  const [penPoints, setPenPoints] = useState<number[] | null>(null);
   const [schemeNames, setSchemeNames] = useState<string[]>([]);
   const [containerWidth, setContainerWidth] = useState(PITCH_WIDTH);
   const [realTeamAId, setRealTeamAId] = useState<string | null>(null);
@@ -211,6 +217,7 @@ export default function App() {
       ball: { id: 'ball', x: PITCH_WIDTH / 2, y: PITCH_HEIGHT / 2 },
       arrows: [],
       zones: [],
+      penStrokes: [],
     });
   }, [formationA, formationB, realTeamAId, realTeamBId, pushHistory]);
 
@@ -240,6 +247,7 @@ export default function App() {
         ball: { id: 'ball', x: PITCH_WIDTH / 2, y: PITCH_HEIGHT / 2 },
         arrows: [],
         zones: [],
+        penStrokes: [],
       }));
     },
     [formationA, formationB, pushHistory],
@@ -253,6 +261,11 @@ export default function App() {
   const handleClearZones = useCallback(() => {
     pushHistory();
     setBoard((b) => ({ ...b, zones: [] }));
+  }, [pushHistory]);
+
+  const handleClearPen = useCallback(() => {
+    pushHistory();
+    setBoard((b) => ({ ...b, penStrokes: [] }));
   }, [pushHistory]);
 
   const findTokenIdAt = (target: Konva.Node): string | undefined => {
@@ -282,6 +295,11 @@ export default function App() {
       return;
     }
 
+    if (mode === 'pen') {
+      setPenPoints([pointer.x, pointer.y]);
+      return;
+    }
+
     const tokenId = findTokenIdAt(e.target);
     let startX = pointer.x;
     let startY = pointer.y;
@@ -296,7 +314,7 @@ export default function App() {
   };
 
   const handlePointerMove = (e: Konva.KonvaEventObject<PointerEvent>) => {
-    if (!drawingArrow && !freeDrawPoints && !shapeDraft) return;
+    if (!drawingArrow && !freeDrawPoints && !shapeDraft && !penPoints) return;
     const stage = e.target.getStage();
     if (!stage) return;
     const pointer = getPointer(stage);
@@ -311,6 +329,15 @@ export default function App() {
       return;
     }
 
+    if (penPoints) {
+      const lastX = penPoints[penPoints.length - 2];
+      const lastY = penPoints[penPoints.length - 1];
+      if (Math.hypot(pointer.x - lastX, pointer.y - lastY) >= 2) {
+        setPenPoints([...penPoints, pointer.x, pointer.y]);
+      }
+      return;
+    }
+
     if (shapeDraft) {
       setShapeDraft((d) => (d ? { ...d, endX: pointer.x, endY: pointer.y } : d));
       return;
@@ -320,6 +347,16 @@ export default function App() {
   };
 
   const handlePointerUp = () => {
+    if (penPoints) {
+      const points = penPoints;
+      setPenPoints(null);
+      if (points.length < 4) return;
+      pushHistory();
+      const stroke: PenStrokeData = { id: makeId('pen'), points, color: penColor };
+      setBoard((b) => ({ ...b, penStrokes: [...b.penStrokes, stroke] }));
+      return;
+    }
+
     if (freeDrawPoints) {
       const points = freeDrawPoints;
       setFreeDrawPoints(null);
@@ -364,6 +401,7 @@ export default function App() {
         ...b,
         arrows: b.arrows.filter((a) => a.id !== id),
         zones: b.zones.filter((z) => z.id !== id),
+        penStrokes: b.penStrokes.filter((s) => s.id !== id),
       }));
     },
     [pushHistory],
@@ -460,7 +498,10 @@ export default function App() {
 
     pushHistory();
     if (!sequenceStartSnapshot) setSequenceStartSnapshot(board);
-    setSequenceSteps((steps) => [...steps, { id: makeId('step'), arrows: board.arrows, zones: board.zones }]);
+    setSequenceSteps((steps) => [
+      ...steps,
+      { id: makeId('step'), arrows: board.arrows, zones: board.zones, penStrokes: board.penStrokes },
+    ]);
 
     const moves = new Map<string, ArrowData>();
     for (const arrow of board.arrows) {
@@ -497,7 +538,7 @@ export default function App() {
     await nextAnimationFrame();
     await nextAnimationFrame();
     for (const step of sequenceSteps) {
-      setBoard((b) => ({ ...b, arrows: step.arrows, zones: step.zones }));
+      setBoard((b) => ({ ...b, arrows: step.arrows, zones: step.zones, penStrokes: step.penStrokes }));
       await nextAnimationFrame();
       await nextAnimationFrame();
       await animateArrows(step.arrows);
@@ -551,7 +592,7 @@ export default function App() {
     drawFrame();
 
     for (const step of sequenceSteps) {
-      setBoard((b) => ({ ...b, arrows: step.arrows, zones: step.zones }));
+      setBoard((b) => ({ ...b, arrows: step.arrows, zones: step.zones, penStrokes: step.penStrokes }));
       await nextAnimationFrame();
       await nextAnimationFrame();
       drawFrame();
@@ -584,7 +625,7 @@ export default function App() {
     setEditingPlayerId(null);
     setSequenceSteps([]);
     setSequenceStartSnapshot(null);
-    setBoard({ ...scheme.state, zones: scheme.state.zones ?? [] });
+    setBoard({ ...scheme.state, zones: scheme.state.zones ?? [], penStrokes: scheme.state.penStrokes ?? [] });
   }, [pushHistory]);
 
   const handleSelectPlayer = useCallback((id: string) => {
@@ -641,6 +682,11 @@ export default function App() {
     return null;
   }, [freeDrawPoints, shapeDraft, zoneShape, highlightColor]);
 
+  const previewPen: PenStrokeData | null = useMemo(() => {
+    if (!penPoints) return null;
+    return { id: 'preview-pen', points: penPoints, color: penColor };
+  }, [penPoints, penColor]);
+
   const editingPlayer = board.players.find((p) => p.id === editingPlayerId) ?? null;
 
   return (
@@ -653,6 +699,8 @@ export default function App() {
         setHighlightColor={setHighlightColor}
         zoneShape={zoneShape}
         setZoneShape={setZoneShape}
+        penColor={penColor}
+        setPenColor={setPenColor}
         formationA={formationA}
         formationB={formationB}
         setFormationA={setFormationA}
@@ -668,6 +716,7 @@ export default function App() {
         canUndo={canUndo}
         onClearArrows={handleClearArrows}
         onClearZones={handleClearZones}
+        onClearPen={handleClearPen}
         sequenceStepsCount={sequenceSteps.length}
         maxSequenceSteps={MAX_SEQUENCE_STEPS}
         canAddSequenceStep={sequenceSteps.length < MAX_SEQUENCE_STEPS && board.arrows.some((a) => a.targetId)}
@@ -736,6 +785,12 @@ export default function App() {
               onDragEnd={() => {}}
             />
           </Layer>
+          <Layer>
+            {board.penStrokes.map((stroke) => (
+              <PenStroke key={stroke.id} data={stroke} erasable={mode === 'erase'} onClick={handleErase} />
+            ))}
+            {previewPen && <PenStroke data={previewPen} erasable={false} />}
+          </Layer>
         </Stage>
       </div>
       <p className="hint">
@@ -746,7 +801,7 @@ export default function App() {
         evidenziare gli spazi. Nella sezione "Squadre Serie A" puoi caricare la rosa e i colori reali di una squadra
         per lato. In modalità "Muovi" clicca su un giocatore per modificarne nome e numero. Nella sezione "Sequenza
         video" puoi disegnare fino a 5 fasi di movimento in successione, poi riprodurle tutte di seguito o scaricarle
-        come video.
+        come video. Modalità "Penna": scrivi o disegna a mano libera con un tratto sottile, come con un pennarello.
       </p>
     </div>
   );

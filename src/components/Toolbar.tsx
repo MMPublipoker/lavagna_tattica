@@ -9,6 +9,8 @@ interface ToolbarProps {
   setHighlightColor: (color: string) => void;
   zoneShape: ZoneKind;
   setZoneShape: (shape: ZoneKind) => void;
+  penColor: string;
+  setPenColor: (color: string) => void;
   formationA: Formation;
   formationB: Formation;
   setFormationA: (f: Formation) => void;
@@ -24,6 +26,7 @@ interface ToolbarProps {
   canUndo: boolean;
   onClearArrows: () => void;
   onClearZones: () => void;
+  onClearPen: () => void;
   sequenceStepsCount: number;
   maxSequenceSteps: number;
   canAddSequenceStep: boolean;
@@ -61,7 +64,15 @@ const MODE_BUTTONS: Array<{ mode: ToolMode; label: string }> = [
   { mode: 'pass', label: '┄➔ Passaggio' },
   { mode: 'dribble', label: '〜➔ Dribbling' },
   { mode: 'draw', label: '✏️ Zone' },
+  { mode: 'pen', label: '✍️ Penna' },
   { mode: 'erase', label: '🧹 Gomma' },
+];
+
+const PEN_COLORS: Array<{ color: string; label: string }> = [
+  { color: '#ffffff', label: 'Bianco' },
+  { color: '#000000', label: 'Nero' },
+  { color: '#ffd43b', label: 'Giallo' },
+  { color: '#ff6b6b', label: 'Rosso' },
 ];
 
 const HIGHLIGHT_COLORS: Array<{ color: string; label: string }> = [
@@ -84,6 +95,8 @@ export default function Toolbar({
   setHighlightColor,
   zoneShape,
   setZoneShape,
+  penColor,
+  setPenColor,
   formationA,
   formationB,
   setFormationA,
@@ -99,6 +112,7 @@ export default function Toolbar({
   canUndo,
   onClearArrows,
   onClearZones,
+  onClearPen,
   sequenceStepsCount,
   maxSequenceSteps,
   canAddSequenceStep,
@@ -159,6 +173,19 @@ export default function Toolbar({
               ))}
             </div>
           </>
+        )}
+        {mode === 'pen' && (
+          <div className="button-row">
+            {PEN_COLORS.map((c) => (
+              <button
+                key={c.color}
+                className={penColor === c.color ? 'swatch-btn active' : 'swatch-btn'}
+                style={{ backgroundColor: c.color }}
+                title={c.label}
+                onClick={() => setPenColor(c.color)}
+              />
+            ))}
+          </div>
         )}
       </div>
 
@@ -243,6 +270,9 @@ export default function Toolbar({
           </button>
           <button className="tool-btn" onClick={onClearZones}>
             ✕ Pulisci zone
+          </button>
+          <button className="tool-btn" onClick={onClearPen}>
+            ✕ Pulisci penna
           </button>
         </div>
       </div>

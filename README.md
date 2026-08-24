@@ -12,6 +12,7 @@ App web per disegnare schemi tattici di calcio: campo da gioco, giocatori delle 
 - Caricamento del preset di ogni squadra di Serie A (rosa, numeri, modulo base e colori sociali) per lato
 - Modifica manuale di nome e numero di ogni giocatore (click sul giocatore in modalità "Muovi")
 - Sequenze video: fino a 5 fasi di movimento consecutive, riproducibili come un piccolo video e scaricabili in formato webm
+- Penna a mano libera per scrivere note e disegnare sul campo con un tratto sottile
 - Annulla ultima azione, pulizia freccette, reset formazione
 - Salvataggio e caricamento schemi (in locale, nel browser)
 

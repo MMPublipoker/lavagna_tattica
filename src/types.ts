@@ -55,7 +55,13 @@ export interface EllipseZoneData extends ZoneBase {
 
 export type ZoneData = FreehandZoneData | RectZoneData | EllipseZoneData;
 
-export type ToolMode = 'select' | 'run' | 'pass' | 'dribble' | 'draw' | 'erase';
+export interface PenStrokeData {
+  id: string;
+  points: number[];
+  color: string;
+}
+
+export type ToolMode = 'select' | 'run' | 'pass' | 'dribble' | 'draw' | 'pen' | 'erase';
 
 export type Formation =
   | '4-4-2'
@@ -77,12 +83,14 @@ export interface BoardState {
   ball: BallData;
   arrows: ArrowData[];
   zones: ZoneData[];
+  penStrokes: PenStrokeData[];
 }
 
 export interface SequenceStep {
   id: string;
   arrows: ArrowData[];
   zones: ZoneData[];
+  penStrokes: PenStrokeData[];
 }
 
 export interface SavedScheme {
